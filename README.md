@@ -1,2 +1,2 @@
-# my_dl_framework
-A Pytorch-based framework for deep learning
+# My Deep Learning Framework
+A Pytorch-based framework for deep learning. 
