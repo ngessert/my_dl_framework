@@ -8,10 +8,13 @@ Options:
     -t --training        run training.
     -v --validate        run validation.
     -p --predict         run prediction on new data.
+Example:
+    python my_dl_framework\\training\\train.py --config=C:\\sources\\my_dl_framework\\configs\\test_config.yaml -t
 """
 
 from docopt import docopt
 import json
+import yaml
 import os
 import numpy as np
 import torch
@@ -24,8 +27,9 @@ from utils import get_dataset, get_model, get_lossfunction, get_optimizer, get_l
 def main():
     args = docopt(__doc__)
     # Import config
-    with open(os.path.join("../../configs", args["--config"])) as f:
-        config = json.load(f)
+    with open(args["--config"]) as f:
+        config = yaml.safe_load(f)
+        print(f'Using config {args["--config"]}')
     # Run Training
     if args["--training"]:
         # Setup CV
@@ -35,7 +39,7 @@ def main():
         validation_subsets = data_split["validation_splits"]
         for idx, (subset_train, subset_val) in enumerate(zip(training_subsets, validation_subsets)):
             print(f'Starting fold number {idx+1}/{len(training_subsets)}')
-            curr_subfolder = os.path.join(config['base_path'], "experiments", args["--config"], "CV_" + str(idx+1))
+            curr_subfolder = os.path.join(config['base_path'], "experiments", args["--config"].replace("\\", "/").split("/")[-1], "CV_" + str(idx+1))
             # Data
             dataset_train = get_dataset(config=config, image_dir=config["training_image_dir"], subset=subset_train,
                                         is_training=True)
@@ -43,9 +47,6 @@ def main():
             dataset_val = get_dataset(config=config, image_dir=config["training_image_dir"], subset=subset_val,
                                       is_training=False)
             print(f'Size validation dataset {len(dataset_val)}')
-
-            def worker_init(worker_id):
-                return np.random.seed(np.random.get_state()[1][0] + worker_id)
 
             dataloader_train = DataLoader(dataset=dataset_train, batch_size=config["batch_size"], shuffle=True,
                                           num_workers=8, pin_memory=True,
@@ -89,7 +90,7 @@ def main():
                 start_epoch = 0
                 os.makedirs(curr_subfolder, exist_ok=False)
             # Training
-            for epoch in range(start_epoch, config['num_epochs']):
+            for epoch in tqdm(range(start_epoch, config['num_epochs'])):
                 np.random.seed(np.random.get_state()[1][0] + epoch)
                 model.train()
                 for batch_idx, (images, targets) in tqdm(enumerate(dataloader_train)):

@@ -1,6 +1,6 @@
 pytest
 pip
-pytorch
+torch
 torchvision
-cudatoolkit==10.2
 pytest-cov
+pyyaml

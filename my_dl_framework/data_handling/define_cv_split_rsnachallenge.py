@@ -6,6 +6,8 @@ Options:
     -h --help                   Display help
     --num_cv=<num_cv>           Number of cv splits
     --save_path=<save_path>     file.json containing the defined splits
+Example:
+    python my_dl_framework\\data_handling\\define_cv_split_rsnachallenge.py --num_cv=3 --save_path=C:\\sources\\my_dl_framework\\cv_splits\\cv_split_3fold.json
 """
 
 from docopt import docopt
@@ -43,7 +45,7 @@ def main():
         cv_cases_dict["training_splits"][cv_split] = [case for case in all_cases if case not in cv_cases_dict["validation_splits"][cv_split]]
     # Save
     with open(os.path.normpath(args["--save_path"]), "w") as f:
-        json.dump(cv_cases_dict, f)
+        json.dump(cv_cases_dict, f, indent=4)
 
 
 if __name__ == "__main__":
