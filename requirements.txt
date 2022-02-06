@@ -1,0 +1,6 @@
+pytest
+pip
+pytorch
+torchvision
+cudatoolkit=10.2
+pytest-cov
