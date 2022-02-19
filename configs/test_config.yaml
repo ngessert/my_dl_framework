@@ -1,8 +1,10 @@
 dataset_type: "RSNAChallengeBinary"
 base_path: "C:\\data\\RSNA_challenge"
+# CV splitting
 data_split_file: "cv_split_3fold.json"
 csv_name: "stage_2_train_labels.csv"
 training_image_dir: "training_images"
+# Training settings
 batch_size: 16
 lr_scheduler: "stepwise"
 step_size: 50
@@ -12,6 +14,7 @@ validate_every_x_epochs": 5
 optimizer: "Adam"
 learning_rate: 0.0001
 loss_name: "cross_entropy"
+# Model settings
 model_name: "Densenet121"
 pretrained: True
 num_classes: 2
@@ -19,3 +22,5 @@ preload_images: False
 resize_images: 256
 random_crop: 224
 random_fliplr: True
+# Validation settings:
+validate_on_train_set: False
