@@ -21,7 +21,8 @@ import torch
 from tqdm import tqdm
 from glob import glob
 from torch.utils.data import DataLoader
-from utils import get_dataset, get_model, get_lossfunction, get_optimizer, get_lr_scheduler, save_optimizer_and_model
+from my_dl_framework.training.utils import get_dataset, get_model, get_lossfunction, get_optimizer, get_lr_scheduler, save_optimizer_and_model
+from my_dl_framework.evaluation.utils import validate_model
 
 
 def main():
@@ -143,6 +144,7 @@ def main():
                         metrics_all[epoch] = metrics
                         # Determine if there is a new best validation model
                         if metrics_all[metrics_all["best_epoch"]][config['val_best_metric']] < metrics[config['val_best_metric']]:
+                            print(f'New best epoch {epoch} with {config["val_best_metric"]} (before: {metrics_all[metrics_all["best_epoch"]][config["val_best_metric"]]})')
                             metrics_all["best_epoch"] = epoch
                             save_optimizer_and_model(optimizer=optimizer, model=model, curr_subfolder=curr_subfolder,
                                                      epoch=epoch, prefix="best_")
