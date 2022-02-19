@@ -11,6 +11,10 @@ import os
 from glob import glob
 import numpy as np
 import pydicom
+import json
+import plotly
+from my_dl_framework.evaluation.utils import validate_model_classification
+from clearml import Logger
 
 
 def get_dataset(config: Dict, image_dir: str, subset: List[str], is_training: bool) -> Dataset:
@@ -96,7 +100,7 @@ class RSNAChallengeBinaryDataset(Dataset):
         """
         return len(self.image_paths)
 
-    def __getitem__(self, idx: int) -> (torch.Tensor, int):
+    def __getitem__(self, idx: int) -> (int, torch.Tensor, int):
         """
         Returns an image and label based on an index
         :param idx:         Index
@@ -113,7 +117,7 @@ class RSNAChallengeBinaryDataset(Dataset):
         image = self.all_transforms(image)
         # Add channels
         image = torch.cat((image, image, image), dim=0)
-        return image, label
+        return idx, image, label
 
 
 def get_model(config: Dict) -> torch.nn.Module:
@@ -192,3 +196,38 @@ def save_optimizer_and_model(optimizer: torch.optim.Optimizer, model: torch.nn.M
         os.remove(os.path.join(curr_subfolder, prefix + "_optimizer_ckpt_" + str(epoch - 1) + ".pt"))
     if os.path.exists(os.path.join(curr_subfolder, prefix + "_model_ckpt_" + str(epoch - 1) + ".pt")):
         os.remove(os.path.join(curr_subfolder, prefix + "_model_ckpt_" + str(epoch - 1) + ".pt"))
+
+
+def evaluate_during_training(eval_name: str, dataloader: torch.utils.data.DataLoader, model: torch.nn.Module, config: Dict, logger: Logger, epoch:int, curr_subfolder: str, use_clearml: bool) -> Dict:
+    print(f'Validating on set {eval_name} of length {len(dataloader)}')
+    metrics, plots = validate_model_classification(model=model, dataloader=dataloader, config=config)
+    for metric in metrics:
+        print(f'{metric}: {np.mean(metrics[metric])} +- {np.std(metrics[metric])}')
+        logger.report_scalar(title=metric, series=eval_name + " " + metric, value=np.mean(metrics[metric]),
+                             iteration=epoch)
+    # plots to clearml
+    if use_clearml:
+        for plot_name, plot in plots.items():
+            # confusion matrix
+            if isinstance(plot, np.ndarray):
+                logger.report_matrix(
+                    eval_name + " Confusion Matrix",
+                    eval_name + "Confusion Maatrix",
+                    iteration=epoch,
+                    matrix=plot,
+                    xaxis="Predicted",
+                    yaxis="Target",
+                    yaxis_reversed=True,
+                )
+            # Plotly figure
+            if isinstance(plot, plotly.graph_objs.Figure):
+                logger.report_plotly(title=eval_name + " " + plot_name, series=eval_name + " " + plot_name, figure=plot, iteration=epoch)
+    # Save metrics
+    if os.path.exists(os.path.join(curr_subfolder, eval_name + "_metrics.json")):
+        with open(os.path.join(curr_subfolder, eval_name + "_metrics.json")) as f:
+            metrics_all = json.load(f)
+        metrics_all[epoch] = metrics
+        # Save
+        with open(os.path.join(curr_subfolder, eval_name + "_metrics.json")) as f:
+            json.dump(metrics_all, f)
+    return metrics_all

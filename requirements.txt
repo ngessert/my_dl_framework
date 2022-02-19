@@ -4,3 +4,5 @@ torch
 torchvision
 pytest-cov
 pyyaml
+clearml
+plotly

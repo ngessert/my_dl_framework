@@ -8,8 +8,9 @@ Options:
     -t --training        run training.
     -v --validate        run validation.
     -p --predict         run prediction on new data.
+    -c --clearml         use clearml
 Example:
-    python my_dl_framework\\training\\train.py --config=C:\\sources\\my_dl_framework\\configs\\test_config.yaml -t
+    python my_dl_framework\\training\\train.py --config=C:\\sources\\my_dl_framework\\configs\\test_config.yaml -tc
 """
 
 from docopt import docopt
@@ -21,8 +22,10 @@ import torch
 from tqdm import tqdm
 from glob import glob
 from torch.utils.data import DataLoader
-from my_dl_framework.training.utils import get_dataset, get_model, get_lossfunction, get_optimizer, get_lr_scheduler, save_optimizer_and_model
-from my_dl_framework.evaluation.utils import validate_model
+from my_dl_framework.training.utils import get_dataset, get_model, get_lossfunction, get_optimizer, get_lr_scheduler, save_optimizer_and_model, evaluate_during_training
+from my_dl_framework.evaluation.utils import validate_model_classification
+from clearml import Task
+import plotly
 
 
 def main():
@@ -31,6 +34,15 @@ def main():
     with open(args["--config"]) as f:
         config = yaml.safe_load(f)
         print(f'Using config {args["--config"]}')
+    # ClearML
+    if args["--clearml"]:
+        task = Task.init(project_name='RSNABinary',
+                         task_name='args["--config"]')
+        task.connect(config)
+        logger = task.get_logger()
+    else:
+        task = None
+        logger = None
     # Run Training
     if args["--training"]:
         # Setup CV
@@ -105,7 +117,7 @@ def main():
             for epoch in tqdm(range(start_epoch, config['num_epochs'])):
                 np.random.seed(np.random.get_state()[1][0] + epoch)
                 model.train()
-                for batch_idx, (images, targets) in tqdm(enumerate(dataloader_train)):
+                for batch_idx, (indices, images, targets) in tqdm(enumerate(dataloader_train)):
                     images = images.cuda()
                     targets = targets.cuda()
                     optimizer.zero_grad()
@@ -121,6 +133,9 @@ def main():
                     else:
                         metrics_train_all["train_loss"] = np.concatenate((metrics_train_all["train_loss"], np.array(
                             [[epoch*len(dataloader_train) + batch_idx, loss.detach().cpu().numpy()]])), axis=0)
+                    if args["--clearml"]:
+                        logger.report_scalar(title="Loss", series="Train Loss", value=loss.detach().cpu().numpy(),
+                                             iteration=epoch * len(dataloader_train) + batch_idx)
                 if lr_scheduler is not None:
                     lr_scheduler.step()
                 print(f'Fold {idx+1}/{len(training_subsets)} Epoch {epoch}/{config["num_epochs"]} completed. '
@@ -133,37 +148,24 @@ def main():
                     json.dump(metrics_train_all, f)
                 # Validate in between
                 if epoch % config['validate_every_x_epochs'] == 0:
-                    print(f'Validating on set of length {len(dataloader_val)}')
-                    metrics = validate_model(model=model, dataloader=dataloader_val, config=config)
-                    for metric in metrics:
-                        print(f'{metric}: {np.mean(metrics[metric])} +- {np.std(metrics[metric])}')
-                    # Save metrics
-                    if os.path.exists(os.path.join(curr_subfolder, "validation_metrics.json")):
-                        with open(os.path.join(curr_subfolder, "validation_metrics.json")) as f:
-                            metrics_all = json.load(f)
-                        metrics_all[epoch] = metrics
-                        # Determine if there is a new best validation model
-                        if metrics_all[metrics_all["best_epoch"]][config['val_best_metric']] < metrics[config['val_best_metric']]:
-                            print(f'New best epoch {epoch} with {config["val_best_metric"]} (before: {metrics_all[metrics_all["best_epoch"]][config["val_best_metric"]]})')
-                            metrics_all["best_epoch"] = epoch
-                            save_optimizer_and_model(optimizer=optimizer, model=model, curr_subfolder=curr_subfolder,
-                                                     epoch=epoch, prefix="best_")
-                        # Save
-                        with open(os.path.join(curr_subfolder, "validation_metrics.json")) as f:
-                            json.dump(metrics_all, f)
+                    metrics_all = evaluate_during_training(eval_name="validation", dataloader=dataloader_val, model=model,
+                                                           config=config, logger=logger, epoch=epoch, curr_subfolder=curr_subfolder,
+                                                           use_clearml=args["--clearml"])
+                    # Determine if there is a new best validation model
+                    if metrics_all[metrics_all["best_epoch"]][config['val_best_metric']] < metrics_all[epoch][config['val_best_metric']]:
+                        print(
+                            f'New best epoch {epoch} with {config["val_best_metric"]} (before: {metrics_all[metrics_all["best_epoch"]][config["val_best_metric"]]})')
+                        metrics_all["best_epoch"] = epoch
+                        save_optimizer_and_model(optimizer=optimizer, model=model, curr_subfolder=curr_subfolder,
+                                                 epoch=epoch, prefix="best_")
                     if config['validate_on_train_set']:
-                        print(f'Validating on training set of length {len(dataloader_train_val)}')
-                        metrics_train = validate_model(model=model, dataloader=dataloader_train_val, config=config)
-                        for metric in metrics_train:
-                            print(f'{metric}: {np.mean(metrics_train[metric])} +- {np.std(metrics_train[metric])}')
-                        # Save metrics
-                        if os.path.exists(os.path.join(curr_subfolder, "training_metrics.json")):
-                            with open(os.path.join(curr_subfolder, "training_metrics.json")) as f:
-                                metrics_train_all = json.load(f)
-                            metrics_train_all[epoch] = metrics_train
-                            # Save
-                            with open(os.path.join(curr_subfolder, "training_metrics.json")) as f:
-                                json.dump(metrics_train_all, f)
+                        _ = evaluate_during_training(eval_name="training", dataloader=dataloader_train_val,
+                                                               model=model,
+                                                               config=config, logger=logger, epoch=epoch,
+                                                               curr_subfolder=curr_subfolder,
+                                                               use_clearml=args["--clearml"])
+    if args["--clearml"]:
+        task.close()
 
 
 if __name__ == "__main__":
