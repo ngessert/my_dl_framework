@@ -15,6 +15,7 @@ import json
 import plotly
 from my_dl_framework.evaluation.utils import validate_model_classification
 from clearml import Logger
+import matplotlib.pyplot as plt
 
 
 def get_dataset(config: Dict, image_dir: str, subset: List[str], is_training: bool) -> Dataset:
@@ -55,8 +56,8 @@ class ZeroOneNorm:
         pass
 
     def __call__(self, image: torch.Tensor) -> torch.Tensor:
-        min_val, _ = torch.min(image[...])
-        max_val, _ = torch.max(image[...])
+        min_val, _ = torch.min(image.flatten(), dim=0)
+        max_val, _ = torch.max(image.flatten(), dim=0)
         image = (image - min_val) / (max_val - min_val)
         return image
 
@@ -200,25 +201,21 @@ def save_optimizer_and_model(optimizer: torch.optim.Optimizer, model: torch.nn.M
 
 def evaluate_during_training(eval_name: str, dataloader: torch.utils.data.DataLoader, model: torch.nn.Module, config: Dict, logger: Logger, epoch:int, curr_subfolder: str, use_clearml: bool) -> Dict:
     print(f'Validating on set {eval_name} of length {len(dataloader)}')
-    metrics, plots = validate_model_classification(model=model, dataloader=dataloader, config=config)
+    metrics, plots = validate_model_classification(model=model, dataloader=dataloader, config=config, max_num_batches=config["max_num_batches_val"])
+    # convert to pandas DF
+    metric_df = pd.DataFrame.from_dict(metrics)
+    metric_df["classes"] = config["class_names"] + ["Avg"]
+    metric_df.set_index("classes", inplace=True)
+    print("Metrics" + "-" * 20)
+    print(metric_df)
+    print( "-" * 25)
+    logger.report_table(title="Metrics", series="Metrics", iteration=epoch, table_plot=metric_df)
     for metric in metrics:
-        print(f'{metric}: {np.mean(metrics[metric])} +- {np.std(metrics[metric])}')
         logger.report_scalar(title=metric, series=eval_name + " " + metric, value=np.mean(metrics[metric]),
                              iteration=epoch)
     # plots to clearml
     if use_clearml:
         for plot_name, plot in plots.items():
-            # confusion matrix
-            if isinstance(plot, np.ndarray):
-                logger.report_matrix(
-                    eval_name + " Confusion Matrix",
-                    eval_name + "Confusion Maatrix",
-                    iteration=epoch,
-                    matrix=plot,
-                    xaxis="Predicted",
-                    yaxis="Target",
-                    yaxis_reversed=True,
-                )
             # Plotly figure
             if isinstance(plot, plotly.graph_objs.Figure):
                 logger.report_plotly(title=eval_name + " " + plot_name, series=eval_name + " " + plot_name, figure=plot, iteration=epoch)
@@ -226,8 +223,32 @@ def evaluate_during_training(eval_name: str, dataloader: torch.utils.data.DataLo
     if os.path.exists(os.path.join(curr_subfolder, eval_name + "_metrics.json")):
         with open(os.path.join(curr_subfolder, eval_name + "_metrics.json")) as f:
             metrics_all = json.load(f)
+        for key in metrics_all:
+            metrics_all[key] = np.asarray(metrics_all[key])
         metrics_all[epoch] = metrics
         # Save
         with open(os.path.join(curr_subfolder, eval_name + "_metrics.json")) as f:
-            json.dump(metrics_all, f)
+            json.dump(metrics_all, f, cls=NumpyEncoder)
+    else:
+        metrics_all = dict()
+        metrics_all["best_epoch"] = epoch
+        metrics_all[epoch] = metrics
     return metrics_all
+
+
+class NumpyEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return json.JSONEncoder.default(self, obj)
+
+
+def plot_example_batch(images: torch.Tensor, targets: torch.Tensor, idx: int, save_path: str, config: Dict):
+    batch_size = images.shape[0]
+    fig, ax = plt.subplots(batch_size, 1, figsize=(5 * batch_size, 20))
+    for i in range(batch_size):
+        ax[i].imshow(images[i, 0, :, :].numpy(), cmap="gray")
+        ax[i].set_title(f'Target {config["class_names"][targets[i].item()]}', fontsize=5)
+        ax[i].set_axis_off()
+    os.makedirs(os.path.join(save_path, "example_batches"), exist_ok=True)
+    fig.savefig(os.path.join(save_path, "example_batches", "batch_" + str(idx) + ".png"), bbox_inches='tight', pad_inches=0, dpi=300)

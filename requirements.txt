@@ -6,3 +6,7 @@ pytest-cov
 pyyaml
 clearml
 plotly
+scikit-learn
+numpy
+pandas
+matplotlib

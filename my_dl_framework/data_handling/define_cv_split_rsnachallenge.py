@@ -33,8 +33,8 @@ def main():
     cv_cases_dict = dict()
     cv_cases_dict["validation_splits"] = [[] for _ in range(num_cv)]
     cv_cases_dict["training_splits"] = [[] for _ in range(num_cv)]
-    idx = 0
     for target in cases_per_class:
+        idx = 0
         while idx < len(cases_per_class[target]):
             for cv_split in range(num_cv):
                 if idx < len(cases_per_class[target]):
