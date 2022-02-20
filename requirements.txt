@@ -1,5 +1,6 @@
 pytest
 pip
+tqdm
 torch==1.9.0
 torchvision
 pytest-cov
