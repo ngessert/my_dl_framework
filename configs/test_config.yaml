@@ -10,9 +10,9 @@ batch_size: 16
 lr_scheduler: "stepwise"
 step_size: 50
 lr_step: 2
-num_epochs: 50
+num_epochs: 10
 optimizer: "Adam"
-learning_rate: 0.0001
+learning_rate: 0.00005
 loss_name: "cross_entropy"
 num_batch_examples: 2
 # Model settings
@@ -25,7 +25,7 @@ random_crop: 224
 random_fliplr: True
 continue_training: False
 # Validation settings:
-validate_every_x_epochs: 5
+validate_every_x_epochs: 2
 validate_on_train_set: False
 test_aug_ensemble_mode: mean
 max_num_batches_val: 50

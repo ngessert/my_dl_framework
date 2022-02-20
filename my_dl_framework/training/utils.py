@@ -85,13 +85,16 @@ class RSNAChallengeBinaryDataset(Dataset):
         transform_list = list()
         transform_list.append(transforms.ToTensor())
         transform_list.append(ZeroOneNorm())
+        if self.config['resize_images'] is not None:
+            transform_list.append(transforms.Resize(self.config['resize_images']))
         if self.is_training:
-            if self.config['resize_images'] is not None:
-                transform_list.append(transforms.Resize(self.config['resize_images']))
             if self.config['random_crop'] is not None:
                 transform_list.append(transforms.RandomCrop(self.config['random_crop']))
             if self.config['random_fliplr'] is not None:
                 transform_list.append(transforms.RandomHorizontalFlip())
+        else:
+            if self.config['random_crop'] is not None:
+                transform_list.append(transforms.CenterCrop(self.config['random_crop']))
         self.all_transforms = transforms.Compose(transform_list)
 
     def __len__(self):
