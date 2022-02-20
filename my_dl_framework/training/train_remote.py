@@ -20,7 +20,7 @@ def train_remote(args):
                        task_type=TaskTypes.training,
                        repo="https://github.com/ngessert/my_dl_framework",
                        branch="develop",
-                       script="training/train.py",
+                       script="./training/train.py",
                        argparse_args=[(key, value) for key, value in vars(args).items()],
                      )
     Task.enqueue(task=task, queue_name="default")
