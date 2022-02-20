@@ -16,11 +16,12 @@ import argparse
 def train_remote(args):
     # Define tas
     task = Task.create(project_name='RSNABinary',
-                       task_name=args["--config"].split(os.sep)[-1],
+                       task_name=args.config.split(os.sep)[-1],
                        task_type=TaskTypes.training,
                        repo="https://github.com/ngessert/my_dl_framework",
+                       branch="develop",
                        script="training/train.py",
-                       argparse_args=args,
+                       argparse_args=[(key, value) for key, value in vars(args).items()],
                      )
     Task.enqueue(task=task, queue_name="default")
 
