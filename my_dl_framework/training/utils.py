@@ -250,8 +250,16 @@ def plot_example_batch(images: torch.Tensor, targets: torch.Tensor, idx: int, sa
     batch_size = images.shape[0]
     fig, ax = plt.subplots(batch_size, 1, figsize=(5 * batch_size, 20))
     for i in range(batch_size):
-        ax[i].imshow(images[i, 0, :, :].numpy(), cmap="gray")
-        ax[i].set_title(f'Target {config["class_names"][targets[i].item()]}', fontsize=5)
+        image = images[i, 0, :, :].numpy()
+        target = config["class_names"][targets[i].item()]
+        Logger.current_logger().report_image(
+            f"{i} of {idx} y={target}",
+            "debug example",
+            iteration=0,
+            image=image,
+        )
+        ax[i].imshow(image, cmap="gray")
+        ax[i].set_title(f'Target {target}', fontsize=5)
         ax[i].set_axis_off()
     os.makedirs(os.path.join(save_path, "example_batches"), exist_ok=True)
     fig.savefig(os.path.join(save_path, "example_batches", "batch_" + str(idx) + ".png"), bbox_inches='tight', pad_inches=0, dpi=300)

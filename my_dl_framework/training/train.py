@@ -32,11 +32,13 @@ def run_training(args):
     # ClearML
     if args.clearml:
         if args.remote:
-            task = Task.get_task(task_id=args["--clearmlid"])  # ?
+            task = Task.get_task(project_name="RSNABinary", task_name=args.config.split(os.sep)[-1])  # ?
         else:
             task = Task.init(project_name='RSNABinary',
                              task_name=args.config.split(os.sep)[-1],
-                             reuse_last_task_id=False)
+                             reuse_last_task_id=False,
+                             auto_connect_frameworks={'matplotlib': False}
+                             )
         task.connect(config)
         logger = task.get_logger()
     else:
@@ -136,15 +138,16 @@ def run_training(args):
                     loss.backward()
                     optimizer.step()
                 # Track loss
-                if "train_loss" not in metrics_train_all:
-                    metrics_train_all["train_loss"] = np.array([[epoch * len(dataloader_train) + batch_idx,
-                                                           loss.detach().cpu().numpy()]])
-                else:
-                    metrics_train_all["train_loss"] = np.concatenate((metrics_train_all["train_loss"], np.array(
-                        [[epoch*len(dataloader_train) + batch_idx, loss.detach().cpu().numpy()]])), axis=0)
-                if args.clearml:
-                    logger.report_scalar(title="Loss", series="Train Loss", value=loss.detach().cpu().numpy(),
-                                         iteration=epoch * len(dataloader_train) + batch_idx)
+                if batch_idx % config["loss_log_freq"] == 0:
+                    if "train_loss" not in metrics_train_all:
+                        metrics_train_all["train_loss"] = np.array([[epoch * len(dataloader_train) + batch_idx,
+                                                               loss.detach().cpu().numpy()]])
+                    else:
+                        metrics_train_all["train_loss"] = np.concatenate((metrics_train_all["train_loss"], np.array(
+                            [[epoch*len(dataloader_train) + batch_idx, loss.detach().cpu().numpy()]])), axis=0)
+                    if args.clearml:
+                        logger.report_scalar(title="Loss", series="Train Loss", value=loss.detach().cpu().numpy(),
+                                             iteration=epoch * len(dataloader_train) + batch_idx)
                 # break  # TODO
             if lr_scheduler is not None:
                 lr_scheduler.step()
