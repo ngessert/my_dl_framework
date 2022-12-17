@@ -1,7 +1,4 @@
 """Training script.
-Usage:
-    train.py --config=<config> [-htvpc]
-
 Options:
     -h --help            show this message and exit.
     --config=<config>    config name to run.
@@ -19,7 +16,7 @@ import torch
 from tqdm import tqdm
 from glob import glob
 from torch.utils.data import DataLoader
-from my_dl_framework.training.utils import get_dataset, get_model, get_lossfunction, get_optimizer, get_lr_scheduler, save_optimizer_and_model, evaluate_during_training, NumpyEncoder, plot_example_batch
+from my_dl_framework.training.utils import get_dataset, get_model, get_lossfunction, get_optimizer, get_lr_scheduler, save_optimizer_and_model, get_and_log_metrics_classification, NumpyEncoder, plot_example_batch
 from clearml import Task
 from datetime import datetime
 
@@ -46,16 +43,16 @@ def run_training(args):
         logger = None
     # Run Training
     # Setup CV
-    with open(config["data_split_file"]) as f:  #os.path.join(config['base_path']
+    with open(config["data_split_file"]) as f:
         data_split = json.load(f)
     training_subsets = data_split["training_splits"]
     validation_subsets = data_split["validation_splits"]
     curr_subfolder = os.path.join(config['base_path'], "experiments", args.config.replace("\\", "/").split("/")[-1])
     if os.path.exists(curr_subfolder) and not config["continue_training"]:
         curr_subfolder += datetime.now().strftime("%d-%m-%Y-%H-%M-%S")
-    for idx, (subset_train, subset_val) in enumerate(zip(training_subsets, validation_subsets)):
-        print(f'Starting fold number {idx+1}/{len(training_subsets)}')
-        curr_subfolder_cv = os.path.join(curr_subfolder, "CV_" + str(idx+1))
+    for cv_idx, (subset_train, subset_val) in enumerate(zip(training_subsets, validation_subsets)):
+        print(f'Starting fold number {cv_idx+1}/{len(training_subsets)}')
+        curr_subfolder_cv = os.path.join(curr_subfolder, "CV_" + str(cv_idx+1))
         # Data
         dataset_train = get_dataset(config=config, image_dir=config["training_image_dir"], subset=subset_train,
                                     is_training=True)
@@ -80,7 +77,7 @@ def run_training(args):
             dataloader_train_val = None
         # Model
         model = get_model(config=config)
-        model = model.cuda()
+        model = model.cuda() if torch.cuda.is_available() else model
         # Loss function/optimizer
         loss_function = get_lossfunction(config=config)
         optimizer = get_optimizer(config=config, model=model)
@@ -121,10 +118,10 @@ def run_training(args):
             start_epoch = 0
             os.makedirs(curr_subfolder_cv, exist_ok=False)
         # Training
-        for epoch in tqdm(range(start_epoch, config['num_epochs'])):
+        for epoch in tqdm(range(start_epoch, config['num_epochs']), disable=args.clearml):
             np.random.seed(np.random.get_state()[1][0] + epoch)
             model.train()
-            for batch_idx, (indices, images, targets) in tqdm(enumerate(dataloader_train)):
+            for batch_idx, (indices, images, targets) in tqdm(enumerate(dataloader_train), disable=args.clearml):
                 if epoch == 0 and batch_idx <= config["num_batch_examples"]:
                     plot_example_batch(images, targets, batch_idx, curr_subfolder_cv, config)
                 if torch.cuda.is_available():
@@ -148,10 +145,9 @@ def run_training(args):
                     if args.clearml:
                         logger.report_scalar(title="Loss", series="Train Loss", value=loss.detach().cpu().numpy(),
                                              iteration=epoch * len(dataloader_train) + batch_idx)
-                # break  # TODO
             if lr_scheduler is not None:
                 lr_scheduler.step()
-            print(f'Fold {idx+1}/{len(training_subsets)} Epoch {epoch}/{config["num_epochs"]} completed. '
+            print(f'Fold {cv_idx+1}/{len(training_subsets)} Epoch {epoch}/{config["num_epochs"]} completed. '
                   f'Last train loss: {loss.detach().cpu().numpy()}')
             # Save
             save_optimizer_and_model(optimizer=optimizer, model=model, curr_subfolder=curr_subfolder_cv,
@@ -161,9 +157,9 @@ def run_training(args):
                 json.dump(metrics_train_all, f, cls=NumpyEncoder)
             # Validate in between
             if epoch % config['validate_every_x_epochs'] == 0:
-                metrics_all = evaluate_during_training(eval_name="validation", dataloader=dataloader_val, model=model,
-                                                       config=config, logger=logger, epoch=epoch, curr_subfolder=curr_subfolder_cv,
-                                                       use_clearml=args.clearml)
+                metrics_all, _, _ = get_and_log_metrics_classification(eval_name="validation", dataloader=dataloader_val, model=model,
+                                                                       config=config, logger=logger, epoch=epoch, curr_subfolder=curr_subfolder_cv,
+                                                                       use_clearml=args.clearml)
                 # Determine if there is a new best validation model
                 if metrics_all[metrics_all["best_epoch"]][config['val_best_metric']][-1] < metrics_all[epoch][config['val_best_metric']][-1]:
                     print(
@@ -172,11 +168,20 @@ def run_training(args):
                     save_optimizer_and_model(optimizer=optimizer, model=model, curr_subfolder=curr_subfolder_cv,
                                              epoch=epoch, prefix="best_")
                 if config['validate_on_train_set']:
-                    _ = evaluate_during_training(eval_name="training", dataloader=dataloader_train_val,
+                    _ = get_and_log_metrics_classification(eval_name="training", dataloader=dataloader_train_val,
                                                            model=model,
                                                            config=config, logger=logger, epoch=epoch,
                                                            curr_subfolder=curr_subfolder_cv,
                                                            use_clearml=args.clearml)
+        # Log artifacts in clearml
+        if args.clearml:
+            if os.path.isfile(os.path.join(curr_subfolder_cv, "training_metrics.json")):
+                task.upload_artifact(name=f"training_metrics_cv{cv_idx}.json",
+                                     artifact_object=os.path.join(curr_subfolder_cv, "training_metrics.json"))
+            if os.path.isfile(os.path.join(curr_subfolder_cv, "validation_metrics.json")):
+                task.upload_artifact(name=f"validation_metrics_cv{cv_idx}.json",
+                                     artifact_object=os.path.join(curr_subfolder_cv, "validation_metrics.json"))
+            # TODO: upload model and optimizer
     print("Training Completed")
     if args.clearml:
         task.close()

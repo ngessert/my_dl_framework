@@ -8,6 +8,7 @@ from sklearn.metrics import confusion_matrix, f1_score, roc_curve, roc_auc_score
 import plotly.graph_objects as go
 import plotly.figure_factory as ff
 
+
 def get_roc_curve(class_names: List[str], predictions: np.ndarray, targets: np.ndarray) -> (go.Figure, List):
     """
     Returns a plotly ROC curve and AUC scores
@@ -75,15 +76,18 @@ def get_confusion_matrix(conf_matrix: np.ndarray, class_names: List[str]) -> go.
     return fig
 
 
-def validate_model_classification(model: torch.nn.Module, dataloader: DataLoader, config: Dict, max_num_batches: int) -> (Dict, List):
+def validate_model_classification(model: torch.nn.Module,
+                                  dataloader: DataLoader,
+                                  config: Dict,
+                                  max_num_batches: int = None,
+                                  use_cleaml: bool = True) -> (Dict, List, np.ndarray, np.ndarray):
     """
     Validates a model using data from a dataloader
     :param model:           Torch model
     :param dataloader:      Dataloader
     :param config:          Dict with config
     :param max_num_batches: Maximum number of batches to use
-    :param class_names:     Class names
-    :return:                Metrics
+    :return:                Metrics, plots, predictions, targets
     """
     metrics = dict()
     plots = dict()
@@ -92,8 +96,8 @@ def validate_model_classification(model: torch.nn.Module, dataloader: DataLoader
     # Get predictions
     all_predictions = dict()
     all_targets = dict()
-    for batch_idx, (indices, images, targets) in tqdm(enumerate(dataloader)):
-        if max_num_batches == batch_idx:
+    for batch_idx, (indices, images, targets) in tqdm(enumerate(dataloader), disable=use_cleaml):
+        if max_num_batches is not None and max_num_batches == batch_idx:
             break
         if torch.cuda.is_available():
             images = images.cuda()
@@ -158,4 +162,4 @@ def validate_model_classification(model: torch.nn.Module, dataloader: DataLoader
     metrics["specificity"] = specificity
     metrics["precision"] = precision
     metrics["auc_score"] = auc_scores
-    return metrics, plots
+    return metrics, plots, all_predictions_arr, all_targets_arr

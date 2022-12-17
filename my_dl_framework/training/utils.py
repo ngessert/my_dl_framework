@@ -1,7 +1,7 @@
 """
 Training utility stuff
 """
-from typing import Dict, List
+from typing import Dict, List, Union
 from torch.utils.data import Dataset
 import torch
 from torchvision import transforms
@@ -18,7 +18,7 @@ from clearml import Logger
 import matplotlib.pyplot as plt
 
 
-def get_dataset(config: Dict, image_dir: str, subset: List[str], is_training: bool) -> Dataset:
+def get_dataset(config: Dict, image_dir: str, subset: Union[List[str], None], is_training: bool) -> Dataset:
     """
     Getter for a torch dataset
     :param config:          Dict with config
@@ -66,16 +66,21 @@ class RSNAChallengeBinaryDataset(Dataset):
     """
     Dataset for RSNA challenge classification task
     """
-    def __init__(self, config: Dict, image_dir: str, subset: List[str], is_training: bool):
+    def __init__(self, config: Dict, image_dir: str, subset: Union[List[str], None], is_training: bool, allow_missing_target: bool = False):
         self.config = config
         self.is_training = is_training
         self.subset = subset
+        self.allow_missing_target = allow_missing_target
         # Load labels
         self.labels = pd.read_csv(os.path.join(self.config['base_path'], self.config['csv_name']))
         # Get images
-        self.image_paths = [file_name for file_name in glob(os.path.join(self.config['base_path'], image_dir, "*"))
-                            if os.path.isfile(file_name) and
-                            os.path.normpath(file_name).split(os.path.sep)[-1].split(".")[0] in self.subset]
+        if self.subset is not None:
+            self.image_paths = [file_name for file_name in glob(os.path.join(self.config['base_path'], image_dir, "*"))
+                                if os.path.isfile(file_name) and
+                                os.path.normpath(file_name).split(os.path.sep)[-1].split(".")[0] in self.subset]
+        else:
+            self.image_paths = [file_name for file_name in glob(os.path.join(self.config['base_path'], image_dir, "*"))
+                                if os.path.isfile(file_name)]
         print("Len img paths", len(self.image_paths))
         self.images = list()
         if self.config['preload_images']:
@@ -116,7 +121,12 @@ class RSNAChallengeBinaryDataset(Dataset):
             image = load_any_image(self.image_paths[idx])
         # Label from csv
         base_file_name = os.path.normpath(self.image_paths[idx]).split(os.path.sep)[-1].split(".")[0]
-        label = int(self.labels.loc[self.labels['patientId'] == base_file_name].iloc[0]['Target'])
+        if base_file_name in self.labels['patientId']:
+            label = int(self.labels.loc[self.labels['patientId'] == base_file_name].iloc[0]['Target'])
+        elif self.allow_missing_target:
+            label = 0
+        else:
+            raise ValueError(f"No label found for patient {base_file_name}")
         # Data augmentation
         image = self.all_transforms(image)
         # Add channels
@@ -202,22 +212,40 @@ def save_optimizer_and_model(optimizer: torch.optim.Optimizer, model: torch.nn.M
         os.remove(os.path.join(curr_subfolder, prefix + "_model_ckpt_" + str(epoch - 1) + ".pt"))
 
 
-def evaluate_during_training(eval_name: str, dataloader: torch.utils.data.DataLoader, model: torch.nn.Module, config: Dict, logger: Logger, epoch:int, curr_subfolder: str, use_clearml: bool) -> Dict:
+def get_and_log_metrics_classification(eval_name: str,
+                                       dataloader: torch.utils.data.DataLoader,
+                                       model: torch.nn.Module,
+                                       config: Dict,
+                                       logger: Logger,
+                                       epoch: int,
+                                       curr_subfolder: str,
+                                       use_clearml: bool) -> (Dict, np.ndarray, np.ndarray):
+    """
+    Function that calls the metric evaluation and then logs it ClearML and disk
+    :param eval_name:       Name of the evaluation, e.g. train or test
+    :param dataloader:      Dataloader to draw samples from
+    :param model:           Model
+    :param config:          Config dict
+    :param logger:          ClearML logger
+    :param epoch:           Epoch for logging
+    :param curr_subfolder:  Subfolder where to store local metrics
+    :param use_clearml:     Whether clearml is used
+    :return:                Metrics, predictions, and targets
+    """
     print(f'Validating on set {eval_name} of length {len(dataloader)}')
-    metrics, plots = validate_model_classification(model=model, dataloader=dataloader, config=config, max_num_batches=config["max_num_batches_val"])
+    metrics, plots, pred, tar = validate_model_classification(model=model, dataloader=dataloader, config=config, max_num_batches=config["max_num_batches_val"], use_cleaml=use_clearml)
     # convert to pandas DF
     metric_df = pd.DataFrame.from_dict(metrics)
     metric_df["classes"] = config["class_names"] + ["Avg"]
     metric_df.set_index("classes", inplace=True)
     print("Metrics" + "-" * 20)
     print(metric_df)
-    print( "-" * 25)
-    logger.report_table(title="Metrics", series="Metrics", iteration=epoch, table_plot=metric_df)
-    for metric in metrics:
-        logger.report_scalar(title=metric, series=eval_name + " " + metric, value=np.mean(metrics[metric]),
-                             iteration=epoch)
-    # plots to clearml
+    print("-" * 25)
     if use_clearml:
+        logger.report_table(title="Metrics", series="Metrics", iteration=epoch, table_plot=metric_df)
+        for metric in metrics:
+            logger.report_scalar(title=metric, series=eval_name + " " + metric, value=np.mean(metrics[metric]),
+                                 iteration=epoch)
         for plot_name, plot in plots.items():
             # Plotly figure
             if isinstance(plot, plotly.graph_objs.Figure):
@@ -229,14 +257,14 @@ def evaluate_during_training(eval_name: str, dataloader: torch.utils.data.DataLo
         for key in metrics_all:
             metrics_all[key] = np.asarray(metrics_all[key])
         metrics_all[epoch] = metrics
-        # Save
-        with open(os.path.join(curr_subfolder, eval_name + "_metrics.json")) as f:
-            json.dump(metrics_all, f, cls=NumpyEncoder)
     else:
         metrics_all = dict()
         metrics_all["best_epoch"] = epoch
         metrics_all[epoch] = metrics
-    return metrics_all
+    # Save
+    with open(os.path.join(curr_subfolder, eval_name + "_metrics.json")) as f:
+        json.dump(metrics_all, f, cls=NumpyEncoder)
+    return metrics_all, pred, tar
 
 
 class NumpyEncoder(json.JSONEncoder):
