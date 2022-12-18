@@ -174,7 +174,7 @@ def run_training(args):
                                                            curr_subfolder=curr_subfolder_cv,
                                                            use_clearml=args.clearml)
         # Log artifacts in clearml
-        if args.clearml:
+        if task is not None:
             if os.path.isfile(os.path.join(curr_subfolder_cv, "training_metrics.json")):
                 task.upload_artifact(name=f"training_metrics_cv{cv_idx}.json",
                                      artifact_object=os.path.join(curr_subfolder_cv, "training_metrics.json"))
@@ -183,7 +183,7 @@ def run_training(args):
                                      artifact_object=os.path.join(curr_subfolder_cv, "validation_metrics.json"))
             # TODO: upload model and optimizer
     print("Training Completed")
-    if args.clearml:
+    if task is not None:
         task.close()
 
 

@@ -1,6 +1,6 @@
 import torch
 import numpy as np
-from typing import Dict, List
+from typing import Dict, List, Tuple
 from torch.utils.data import DataLoader
 import torch.nn.functional as F
 from tqdm import tqdm
@@ -9,7 +9,7 @@ import plotly.graph_objects as go
 import plotly.figure_factory as ff
 
 
-def get_roc_curve(class_names: List[str], predictions: np.ndarray, targets: np.ndarray) -> (go.Figure, List):
+def get_roc_curve(class_names: List[str], predictions: np.ndarray, targets: np.ndarray) -> Tuple[go.Figure, List]:
     """
     Returns a plotly ROC curve and AUC scores
     :param class_names:         Class names, list
@@ -80,7 +80,7 @@ def validate_model_classification(model: torch.nn.Module,
                                   dataloader: DataLoader,
                                   config: Dict,
                                   max_num_batches: int = None,
-                                  use_cleaml: bool = True) -> (Dict, List, np.ndarray, np.ndarray):
+                                  use_cleaml: bool = True) -> Tuple[Dict, List, np.ndarray, np.ndarray]:
     """
     Validates a model using data from a dataloader
     :param model:           Torch model

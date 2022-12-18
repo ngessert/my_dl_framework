@@ -1,7 +1,7 @@
 """
 Training utility stuff
 """
-from typing import Dict, List, Union
+from typing import Dict, List, Tuple, Union
 from torch.utils.data import Dataset
 import torch
 from torchvision import transforms
@@ -109,7 +109,7 @@ class RSNAChallengeBinaryDataset(Dataset):
         """
         return len(self.image_paths)
 
-    def __getitem__(self, idx: int) -> (int, torch.Tensor, int):
+    def __getitem__(self, idx: int) -> Tuple[int, torch.Tensor, int]:
         """
         Returns an image and label based on an index
         :param idx:         Index
@@ -219,7 +219,7 @@ def get_and_log_metrics_classification(eval_name: str,
                                        logger: Logger,
                                        epoch: int,
                                        curr_subfolder: str,
-                                       use_clearml: bool) -> (Dict, np.ndarray, np.ndarray):
+                                       use_clearml: bool) -> Tuple[Dict, np.ndarray, np.ndarray]:
     """
     Function that calls the metric evaluation and then logs it ClearML and disk
     :param eval_name:       Name of the evaluation, e.g. train or test
