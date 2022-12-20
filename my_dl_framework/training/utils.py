@@ -130,7 +130,7 @@ class RSNAChallengeBinaryDataset(Dataset):
         # Data augmentation
         image = self.all_transforms(image)
         # Add channels
-        image = torch.cat((image, image, image), dim=0)
+        image = torch.concat((image, image, image), dim=0)
         return idx, image, label
 
 
@@ -268,15 +268,19 @@ def get_and_log_metrics_classification(eval_name: str,
 
 
 class NumpyEncoder(json.JSONEncoder):
-    def default(self, obj):
-        if isinstance(obj, np.ndarray):
-            return obj.tolist()
-        return json.JSONEncoder.default(self, obj)
+    """ Numpy encoder for JSON saving.
+    """
+    def default(self, o):
+        if isinstance(o, np.ndarray):
+            return o.tolist()
+        return json.JSONEncoder.default(self, o)
 
 
 def plot_example_batch(images: torch.Tensor, targets: torch.Tensor, idx: int, save_path: str, config: Dict):
+    """ Plots some example batches into clearml and to local path
+    """
     batch_size = images.shape[0]
-    fig, ax = plt.subplots(batch_size, 1, figsize=(5 * batch_size, 20))
+    fig, axes = plt.subplots(batch_size, 1, figsize=(5 * batch_size, 20))
     for i in range(batch_size):
         image = images[i, 0, :, :].numpy()
         target = config["class_names"][targets[i].item()]
@@ -286,8 +290,8 @@ def plot_example_batch(images: torch.Tensor, targets: torch.Tensor, idx: int, sa
             iteration=0,
             image=image,
         )
-        ax[i].imshow(image, cmap="gray")
-        ax[i].set_title(f'Target {target}', fontsize=5)
-        ax[i].set_axis_off()
+        axes[i].imshow(image, cmap="gray")
+        axes[i].set_title(f'Target {target}', fontsize=5)
+        axes[i].set_axis_off()
     os.makedirs(os.path.join(save_path, "example_batches"), exist_ok=True)
     fig.savefig(os.path.join(save_path, "example_batches", "batch_" + str(idx) + ".png"), bbox_inches='tight', pad_inches=0, dpi=300)

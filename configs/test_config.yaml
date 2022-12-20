@@ -25,6 +25,7 @@ resize_images: 256
 random_crop: 224
 random_fliplr: True
 continue_training: False
+ckpt_every_n_epochs: 2
 # Validation settings:
 validate_every_x_epochs: 2
 validate_on_train_set: False

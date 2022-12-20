@@ -1,24 +1,23 @@
-
 from typing import Dict
+import pandas as pd
 import torch
-from torch import nn
 from torch.nn import functional as F
-from torch.utils.data import DataLoader
-from torch.utils.data import random_split
-from torchvision.datasets import MNIST
-from torchvision import transforms
 import pytorch_lightning as pl
 
-from my_dl_framework.training.utils import get_lossfunction, get_model, get_optimizer
+from my_dl_framework.evaluation.utils import calculate_metrics
+from my_dl_framework.training.utils import get_lossfunction, get_lr_scheduler, get_model, get_optimizer
+from my_dl_framework.utils.pytorch_lightning.clearml_logger import PLClearML
 
-class PLWrapper(pl.LightningModule):
+
+class PLClassificationWrapper(pl.LightningModule):
+    """ Pytorch lightning wrapper for classification models
+    """
     def __init__(self, config: Dict, 
-                 training_set_len: int = 0,
-                 clearml_logger = None):
+                 training_set_len: int = 0):
+        super().__init__()
         self.config = config
         self.modules = get_model(config=self.config)
         self.loss_function = get_lossfunction(config=self.config)
-        self.clearml_logger = clearml_logger
         self.training_set_len = training_set_len
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -26,38 +25,52 @@ class PLWrapper(pl.LightningModule):
         return res
 
     def configure_optimizers(self):
-        optimizer = get_optimizer(self.config)
-        return optimizer
+        optimizer = get_optimizer(self.config, self.modules)
+        lr_scheduler = get_lr_scheduler(self.config, optimizer)
+        return {"optimizer": optimizer, "lr_scheduler": lr_scheduler}
 
     def training_step(self, train_batch, batch_idx):
         images, targets = train_batch
         outputs = self.model(images)
         loss = self.loss_function(outputs, targets)
+        return {"loss": loss, "batch_idx": batch_idx}
+
+    def training_step_end(self, step_output):
+        batch_idx = step_output["batch_idx"][0]
+        loss = torch.stack(step_output["loss"])
         # Track loss
         if batch_idx % self.config["loss_log_freq"] == 0:
             self.log("train_loss", loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
-            if self.clearml_logger is not None:
-                self.clearml_logger.report_scalar(title="Loss", 
-                                                  series="Train Loss", 
-                                                  value=loss.detach().cpu().numpy(),
-                                                  iteration=self.current_epoch * self.training_set_len + batch_idx)
-        return loss
+        return 
 
-    def validation_step(self, val_batch, batch_idx):
+    def validation_step(self, val_batch, batch_idx, dataloader_idx):
         images, targets = val_batch
-        outputs = F.softmax(model(images), dim=1)
+        outputs = F.softmax(self.modules(images), dim=1)
+        return {"outputs": outputs, "targets": targets, "dataloader_idx": dataloader_idx}
 
-# data
-dataset = MNIST('', train=True, download=True, transform=transforms.ToTensor())
-mnist_train, mnist_val = random_split(dataset, [55000, 5000])
+    def validation_step_end(self, step_output):
+        return {"outputs": torch.stack(step_output["outputs"]),
+                "targets": torch.stack(step_output["targets"]),
+                "dataloader_idx": step_output["dataloader_idx"][0]}
 
-train_loader = DataLoader(mnist_train, batch_size=32)
-val_loader = DataLoader(mnist_val, batch_size=32)
-
-# model
-model = LitAutoEncoder()
-
-# training
-trainer = pl.Trainer(gpus=4, num_nodes=8, precision=16, limit_train_batches=0.5)
-trainer.fit(model, train_loader, val_loader)
-    
+    def validation_epoch_end(self, outputs):
+        # Assumes val loader is put first
+        eval_name = "validation" if outputs["dataloader_idx"][0] == 0 else "train_val"
+        outputs = torch.stack(outputs["outputs"])
+        targets = torch.stack(outputs["targets"])
+        metrics, plots = calculate_metrics(predictions=outputs.deatch().numpy(),
+                                           targets=targets.detach().numpy(),
+                                           class_names=self.config["class_names"])
+        for i in range(len(self.config["class_names"])):
+            self.log_dict({key + "_" + self.config["class_names"][i]: val[i] for key, val in metrics.items()})
+        self.log_dict({key + "_mean": val[-1] for key, val in metrics.items()})
+        for logger in self.loggers:
+            if isinstance(logger, PLClearML):
+                logger.log_plotly(plotly_obj_dict=plots,
+                                  step=self.current_epoch)
+                metric_df = pd.DataFrame.from_dict(metrics)
+                metric_df["classes"] = self.config["class_names"] + ["Avg"]
+                metric_df.set_index("classes", inplace=True)
+                logger.log_table(title="Metrics " + eval_name,
+                                 step=self.current_epoch,
+                                 dataframe=metric_df)

@@ -4,7 +4,7 @@ from typing import Dict, List, Tuple
 from torch.utils.data import DataLoader
 import torch.nn.functional as F
 from tqdm import tqdm
-from sklearn.metrics import confusion_matrix, f1_score, roc_curve, roc_auc_score
+from sklearn.metrics import confusion_matrix, f1_score, roc_curve, roc_auc_score, log_loss
 import plotly.graph_objects as go
 import plotly.figure_factory as ff
 
@@ -75,6 +75,57 @@ def get_confusion_matrix(conf_matrix: np.ndarray, class_names: List[str]) -> go.
                             ))
     return fig
 
+def calculate_metrics(predictions: np.ndarray, 
+                      targets: np.ndarray,
+                      class_names: List[str]) -> Tuple[Dict, Dict]:
+    """ Calculate classification metrics from predictions (BxC) 
+        and targets (B)
+    """
+    metrics = dict()
+    plots = dict()
+    log_loss_value = log_loss(targets, predictions)
+    log_loss_value = np.repeat(log_loss_value, len(class_names) +1)
+    accuracy = np.zeros([len(class_names) + 1])
+    accuracy[:-1] = np.mean(np.equal(np.argmax(predictions, 1), targets))
+    accuracy[-1] = np.mean(accuracy[:-1])
+    conf_matrix = confusion_matrix(targets, np.argmax(predictions, 1))
+    plots["confusion_matrix"] = get_confusion_matrix(conf_matrix=conf_matrix, class_names=class_names)
+    # Sensitivity / Specificity
+    sensitivity = np.zeros([len(class_names) + 1])
+    specificity = np.zeros([len(class_names) + 1])
+    precision = np.zeros([len(class_names) + 1])
+    for k in range(len(class_names)):
+        sensitivity[k] = conf_matrix[k, k] / (np.sum(conf_matrix[k, :]))
+        true_negative = np.delete(conf_matrix, [k], 0)
+        true_negative = np.delete(true_negative, [k], 1)
+        true_negative = np.sum(true_negative)
+        false_positive = np.delete(conf_matrix, [k], 0)
+        false_positive = np.sum(false_positive[:, k])
+        true_positive = conf_matrix[k, k]
+        specificity[k] = true_negative / (true_negative + false_positive)
+        precision[k] = true_positive / (true_positive + false_positive)
+    # Add average
+    sensitivity[-1] = np.mean(sensitivity[:-1])
+    specificity[-1] = np.mean(specificity[:-1])
+    precision[-1] = np.mean(precision[:-1])
+    # F1 score
+    f1 = np.zeros([len(class_names) + 1])
+    f1[:-1] = f1_score(np.argmax(predictions, 1), targets, average='weighted')
+    f1[-1] = np.mean(f1[:-1])
+    # AUC
+    auc_scores = np.zeros([len(class_names) + 1])
+    fig, auc_scores[:-1] = get_roc_curve(class_names=class_names, predictions=predictions, targets=targets)
+    auc_scores[-1] = np.mean(auc_scores[:-1])
+    plots["roc_curve"] = fig
+    metrics["log_loss_value"] = log_loss_value
+    metrics["accuracy"] = accuracy
+    metrics["f1_score"] = f1
+    metrics["sensitivity"] = sensitivity
+    metrics["specificity"] = specificity
+    metrics["precision"] = precision
+    metrics["auc_score"] = auc_scores
+    return metrics, plots
+
 
 def validate_model_classification(model: torch.nn.Module,
                                   dataloader: DataLoader,
@@ -89,8 +140,6 @@ def validate_model_classification(model: torch.nn.Module,
     :param max_num_batches: Maximum number of batches to use
     :return:                Metrics, plots, predictions, targets
     """
-    metrics = dict()
-    plots = dict()
     model.eval()
     class_names = config["class_names"]
     # Get predictions
@@ -121,45 +170,5 @@ def validate_model_classification(model: torch.nn.Module,
         else:
             all_predictions_arr[idx, :] = all_predictions_arr[key][0]
         all_targets_arr[idx] = all_targets[key][0]
-    # print("tar", all_targets_arr.shape, all_targets_arr)
-    # print("pred", all_predictions_arr.shape, all_predictions_arr)
-    # Metrics and plots
-    accuracy = np.zeros([len(class_names) + 1])
-    accuracy[:-1] = np.mean(np.equal(np.argmax(all_predictions_arr, 1), all_targets_arr))
-    accuracy[-1] = np.mean(accuracy[:-1])
-    conf_matrix = confusion_matrix(all_targets_arr, np.argmax(all_predictions_arr, 1))
-    plots["confusion_matrix"] = get_confusion_matrix(conf_matrix=conf_matrix, class_names=class_names)
-    # Sensitivity / Specificity
-    sensitivity = np.zeros([len(class_names) + 1])
-    specificity = np.zeros([len(class_names) + 1])
-    precision = np.zeros([len(class_names) + 1])
-    for k in range(len(class_names)):
-        sensitivity[k] = conf_matrix[k, k] / (np.sum(conf_matrix[k, :]))
-        true_negative = np.delete(conf_matrix, [k], 0)
-        true_negative = np.delete(true_negative, [k], 1)
-        true_negative = np.sum(true_negative)
-        false_positive = np.delete(conf_matrix, [k], 0)
-        false_positive = np.sum(false_positive[:, k])
-        true_positive = conf_matrix[k, k]
-        specificity[k] = true_negative / (true_negative + false_positive)
-        precision[k] = true_positive / (true_positive + false_positive)
-    # Add average
-    sensitivity[-1] = np.mean(sensitivity[:-1])
-    specificity[-1] = np.mean(specificity[:-1])
-    precision[-1] = np.mean(precision[:-1])
-    # F1 score
-    f1 = np.zeros([len(class_names) + 1])
-    f1[:-1] = f1_score(np.argmax(all_predictions_arr, 1), all_targets_arr, average='weighted')
-    f1[-1] = np.mean(f1[:-1])
-    # AUC
-    auc_scores = np.zeros([len(class_names) + 1])
-    fig, auc_scores[:-1] = get_roc_curve(class_names=class_names, predictions=all_predictions_arr, targets=all_targets_arr)
-    auc_scores[-1] = np.mean(auc_scores[:-1])
-    plots["roc_curve"] = fig
-    metrics["accuracy"] = accuracy
-    metrics["f1_score"] = f1
-    metrics["sensitivity"] = sensitivity
-    metrics["specificity"] = specificity
-    metrics["precision"] = precision
-    metrics["auc_score"] = auc_scores
+    metrics, plots = calculate_metrics(all_predictions_arr, all_targets_arr, class_names)
     return metrics, plots, all_predictions_arr, all_targets_arr

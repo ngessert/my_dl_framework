@@ -9,19 +9,21 @@ Example:
     python my_dl_framework\\training\\train.py --config=C:\\sources\\my_dl_framework\\configs\\test_config.yaml -tc
 """
 import os
-from clearml import Task, TaskTypes
 import argparse
+from clearml import Task, TaskTypes
 
 
-def train_remote(args):
+def train_remote(cmd_args):
+    """ Execute remove job
+    """
     # Define tas
     task = Task.create(project_name='RSNABinary',
-                       task_name=args.config.split(os.sep)[-1],
+                       task_name=cmd_args.config.split(os.sep)[-1],
                        task_type=TaskTypes.training,
                        repo="https://github.com/ngessert/my_dl_framework",
                        branch="develop",
                        script="./my_dl_framework/training/train.py",
-                       argparse_args=[(key, value) for key, value in vars(args).items()],
+                       argparse_args=[(key, value) for key, value in vars(cmd_args).items()],
                      )
     Task.enqueue(task=task, queue_name="default")
 

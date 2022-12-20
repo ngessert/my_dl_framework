@@ -9,12 +9,12 @@ Example:
 
 import argparse
 import json
-import yaml
 import os
+from glob import glob
+import yaml
 import numpy as np
 import torch
 from tqdm import tqdm
-from glob import glob
 from torch.utils.data import DataLoader
 from my_dl_framework.training.utils import get_dataset, get_model, get_lossfunction, get_optimizer, get_lr_scheduler, save_optimizer_and_model, get_and_log_metrics_classification, NumpyEncoder, plot_example_batch
 from clearml import Task
