@@ -23,7 +23,7 @@ from datetime import datetime
 
 def run_training(args):
     # Import config
-    with open(args.config) as f:
+    with open(args.config, encoding="utf-8") as f:
         config = yaml.safe_load(f)
         print(f'Using config {args.config}')
     # ClearML
@@ -43,7 +43,7 @@ def run_training(args):
         logger = None
     # Run Training
     # Setup CV
-    with open(config["data_split_file"]) as f:
+    with open(config["data_split_file"], encoding="utf-8") as f:
         data_split = json.load(f)
     training_subsets = data_split["training_splits"]
     validation_subsets = data_split["validation_splits"]
@@ -104,7 +104,7 @@ def run_training(args):
                 start_epoch = max_epoch
                 # Load metric tracking
                 if os.path.exists(os.path.join(curr_subfolder_cv, "training_metrics.json")):
-                    with open(os.path.join(curr_subfolder_cv, "training_metrics.json")) as f:
+                    with open(os.path.join(curr_subfolder_cv, "training_metrics.json"), encoding="utf-8") as f:
                         metrics_train_all = json.load(f)
                         for key in metrics_train_all:
                             metrics_train_all[key] = np.asarray(metrics_train_all[key])
@@ -153,7 +153,7 @@ def run_training(args):
             save_optimizer_and_model(optimizer=optimizer, model=model, curr_subfolder=curr_subfolder_cv,
                                      epoch=epoch, prefix="last_")
             # Save
-            with open(os.path.join(curr_subfolder_cv, "training_metrics.json"), "w") as f:
+            with open(os.path.join(curr_subfolder_cv, "training_metrics.json"), "w", encoding="utf-8") as f:
                 json.dump(metrics_train_all, f, cls=NumpyEncoder)
             # Validate in between
             if epoch % config['validate_every_x_epochs'] == 0:

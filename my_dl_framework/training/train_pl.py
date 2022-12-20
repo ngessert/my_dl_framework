@@ -21,20 +21,20 @@ from my_dl_framework.models.pl_wrapper import PLClassificationWrapper
 from my_dl_framework.training.utils import get_dataset
 from my_dl_framework.utils.pytorch_lightning.clearml_logger import PLClearML
 
-def run_training(args):
+def run_training(cmd_args):
     """ Run pytorch lightning training
     """
     # Import config
-    with open(args.config) as f:
-        config = yaml.safe_load(f)
-        print(f'Using config {args.config}')
+    with open(cmd_args.config, encoding="utf-8") as file:
+        config = yaml.safe_load(file)
+        print(f'Using config {cmd_args.config}')
     # ClearML
-    if args.clearml:
-        if args.remote:
-            task = Task.get_task(project_name="RSNABinary", task_name=args.config.split(os.sep)[-1])  # ?
+    if cmd_args.clearml:
+        if cmd_args.remote:
+            task = Task.get_task(project_name="RSNABinary", task_name=cmd_args.config.split(os.sep)[-1])  # ?
         else:
             task = Task.init(project_name='RSNABinary',
-                             task_name=args.config.split(os.sep)[-1],
+                             task_name=cmd_args.config.split(os.sep)[-1],
                              reuse_last_task_id=False,
                              auto_connect_frameworks={'matplotlib': False}
                              )
@@ -45,11 +45,11 @@ def run_training(args):
         task = None
     # Run Training
     # Setup CV
-    with open(config["data_split_file"]) as f:
-        data_split = json.load(f)
+    with open(config["data_split_file"], encoding="utf-8") as file:
+        data_split = json.load(file)
     training_subsets = data_split["training_splits"]
     validation_subsets = data_split["validation_splits"]
-    curr_subfolder = os.path.join(config['base_path'], "experiments", args.config.replace("\\", "/").split("/")[-1])
+    curr_subfolder = os.path.join(config['base_path'], "experiments", cmd_args.config.replace("\\", "/").split("/")[-1])
     if os.path.exists(curr_subfolder) and not config["continue_training"]:
         curr_subfolder += datetime.now().strftime("%d-%m-%Y-%H-%M-%S")
     for cv_idx, (subset_train, subset_val) in enumerate(zip(training_subsets, validation_subsets)):
@@ -89,16 +89,16 @@ def run_training(args):
             every_n_epochs=config["ckpt_every_n_epochs"]
         )
         pl.seed_everything(42, workers=True)
-        trainer = pl.Trainer(devices=args.num_gpus,
+        trainer = pl.Trainer(devices=cmd_args.num_gpus,
                              check_val_every_n_epoch=config["validate_every_x_epochs"],
                              default_root_dir=curr_subfolder_cv,
                              accelerator="auto",
                              max_epochs=config["num_epochs"],
-                             auto_select_gpus=True if args.num_gpus is None else False,
-                             strategy=args.multi_gpu_strat,
+                             auto_select_gpus=True if cmd_args.num_gpus is None else False,
+                             strategy=cmd_args.multi_gpu_strat,
                              precision=16,
                              deterministic=True,
-                             fast_dev_run=args.fast_dev_run,
+                             fast_dev_run=cmd_args.fast_dev_run,
                              callbacks=[checkpoint_callback],
                              logger=pl_clearml_logger,
                              )

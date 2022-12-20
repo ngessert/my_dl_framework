@@ -1,21 +1,21 @@
 """
 Training utility stuff
 """
+import os
+from glob import glob
+import json
 from typing import Dict, List, Tuple, Union
 from torch.utils.data import Dataset
 import torch
 from torchvision import transforms
 from torchvision import models as tv_models
 import pandas as pd
-import os
-from glob import glob
 import numpy as np
 import pydicom
-import json
 import plotly
-from my_dl_framework.evaluation.utils import validate_model_classification
 from clearml import Logger
 import matplotlib.pyplot as plt
+from my_dl_framework.evaluation.utils import validate_model_classification
 
 
 def get_dataset(config: Dict, image_dir: str, subset: Union[List[str], None], is_training: bool) -> Dataset:
@@ -41,8 +41,8 @@ def load_any_image(image_path: str) -> np.ndarray:
     :return:                The image as numpy array
     """
     if image_path.endswith(".dcm"):
-        ds = pydicom.dcmread(image_path)
-        image = ds.pixel_array
+        dicom = pydicom.dcmread(image_path)
+        image = dicom.pixel_array
     else:
         raise ValueError(f'Unknown image type {image_path}')
     return image
@@ -140,8 +140,21 @@ def get_model(config: Dict) -> torch.nn.Module:
     :param config:          Dict with config
     :return:                Torch model
     """
-    if config['model_name'] == "Densenet121":
-        model = tv_models.densenet121(pretrained=config['pretrained'])
+    if "TV_" in config["model_name"]:
+        if config['model_name'] == "TV_densenet121":
+            model = tv_models.densenet121(pretrained=config['pretrained'])
+        if config['model_name'] == "TV_densenet161":
+            model = tv_models.densenet161(pretrained=config['pretrained'])
+        if config['model_name'] == "TV_densenet169":
+            model = tv_models.densenet169(pretrained=config['pretrained'])
+        if config['model_name'] == "TV_densenet201":
+            model = tv_models.densenet201(pretrained=config['pretrained'])
+        if config['model_name'] == "TV_efficientnet_v2_s":
+            model = tv_models.efficientnet_v2_s(pretrained=config['pretrained'])
+        if config['model_name'] == "TV_efficientnet_v2_m":
+            model = tv_models.efficientnet_v2_m(pretrained=config['pretrained'])
+        if config['model_name'] == "TV_efficientnet_v2_l":
+            model = tv_models.efficientnet_v2_l(pretrained=config['pretrained'])
         in_features = model.classifier.in_features
         model.classifier = torch.nn.Linear(in_features, config['num_classes'])
     else:
@@ -171,6 +184,10 @@ def get_optimizer(config: Dict, model: torch.nn.Module) -> torch.optim.Optimizer
     """
     if config['optimizer'] == "Adam":
         optimizer = torch.optim.Adam(model.parameters(), lr=config['learning_rate'])
+    elif config["optimizer"] == "SGDM":
+        optimizer = torch.optim.SGD(model.parameters(),
+                                    lr=config['learning_rate'],
+                                    momentum=config["sgd_momentum"])
     else:
         raise ValueError(f'Unknown optimizer name {config["optimizer"]}')
     return optimizer
@@ -243,8 +260,10 @@ def get_and_log_metrics_classification(eval_name: str,
     print("-" * 25)
     if use_clearml:
         logger.report_table(title="Metrics", series="Metrics", iteration=epoch, table_plot=metric_df)
-        for metric in metrics:
-            logger.report_scalar(title=metric, series=eval_name + " " + metric, value=np.mean(metrics[metric]),
+        for metric_name, metric_val in metrics.items():
+            logger.report_scalar(title=metric_name, 
+                                 series=eval_name + " " + metric_name,
+                                 value=np.mean(metric_val),
                                  iteration=epoch)
         for plot_name, plot in plots.items():
             # Plotly figure
@@ -252,8 +271,8 @@ def get_and_log_metrics_classification(eval_name: str,
                 logger.report_plotly(title=eval_name + " " + plot_name, series=eval_name + " " + plot_name, figure=plot, iteration=epoch)
     # Save metrics
     if os.path.exists(os.path.join(curr_subfolder, eval_name + "_metrics.json")):
-        with open(os.path.join(curr_subfolder, eval_name + "_metrics.json")) as f:
-            metrics_all = json.load(f)
+        with open(os.path.join(curr_subfolder, eval_name + "_metrics.json"), encoding="utf-8") as file:
+            metrics_all = json.load(file)
         for key in metrics_all:
             metrics_all[key] = np.asarray(metrics_all[key])
         metrics_all[epoch] = metrics
@@ -262,8 +281,8 @@ def get_and_log_metrics_classification(eval_name: str,
         metrics_all["best_epoch"] = epoch
         metrics_all[epoch] = metrics
     # Save
-    with open(os.path.join(curr_subfolder, eval_name + "_metrics.json")) as f:
-        json.dump(metrics_all, f, cls=NumpyEncoder)
+    with open(os.path.join(curr_subfolder, eval_name + "_metrics.json"), encoding="utf-8") as file:
+        json.dump(metrics_all, file, cls=NumpyEncoder)
     return metrics_all, pred, tar
 
 
