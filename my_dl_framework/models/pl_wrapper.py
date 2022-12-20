@@ -1,4 +1,5 @@
 from typing import Dict
+import numpy as np
 import pandas as pd
 import torch
 from torch.nn import functional as F
@@ -30,7 +31,7 @@ class PLClassificationWrapper(pl.LightningModule):
         return {"optimizer": optimizer, "lr_scheduler": lr_scheduler}
 
     def training_step(self, train_batch, batch_idx):
-        images, targets = train_batch
+        _, images, targets = train_batch
         outputs = self.model(images)
         loss = self.loss_function(outputs, targets)
         return {"loss": loss, "batch_idx": batch_idx}
@@ -41,25 +42,41 @@ class PLClassificationWrapper(pl.LightningModule):
         # Track loss
         if batch_idx % self.config["loss_log_freq"] == 0:
             self.log("train_loss", loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
-        return 
+        return {"loss": loss, "batch_idx": batch_idx}
 
     def validation_step(self, val_batch, batch_idx, dataloader_idx):
-        images, targets = val_batch
+        indices, images, targets = val_batch
         outputs = F.softmax(self.modules(images), dim=1)
-        return {"outputs": outputs, "targets": targets, "dataloader_idx": dataloader_idx}
+        return {"outputs": outputs, 
+                "targets": targets, 
+                "indices": indices,
+                "dataloader_idx": dataloader_idx}
 
     def validation_step_end(self, step_output):
         return {"outputs": torch.stack(step_output["outputs"]),
                 "targets": torch.stack(step_output["targets"]),
+                "indices": torch.stack(step_output["indices"]),
                 "dataloader_idx": step_output["dataloader_idx"][0]}
 
     def validation_epoch_end(self, outputs):
         # Assumes val loader is put first
         eval_name = "validation" if outputs["dataloader_idx"][0] == 0 else "train_val"
-        outputs = torch.stack(outputs["outputs"])
-        targets = torch.stack(outputs["targets"])
-        metrics, plots = calculate_metrics(predictions=outputs.deatch().numpy(),
-                                           targets=targets.detach().numpy(),
+        stacked_preds = torch.stack(outputs["outputs"]).deatch().numpy()
+        stacked_targets = torch.stack(outputs["targets"]).deatch().numpy()
+        stacked_indices = torch.stack(outputs["indices"]).deatch().numpy()
+        predictions = list()
+        targets = list()
+        for idx in np.unique(stacked_indices):
+            if self.config["test_aug_ensemble_mode"] == "mean":
+                predictions.append(np.mean(stacked_preds[stacked_indices == idx], 0))
+                targets.append(np.mean(stacked_targets[stacked_indices == idx]))
+            else:
+                predictions.append(stacked_preds[stacked_indices == idx][0, :])
+                targets.append(stacked_targets[stacked_indices == idx][0])
+        predictions = np.array(predictions)
+        targets = np.array(targets)
+        metrics, plots = calculate_metrics(predictions=outputs,
+                                           targets=targets,
                                            class_names=self.config["class_names"])
         for i in range(len(self.config["class_names"])):
             self.log_dict({key + "_" + self.config["class_names"][i]: val[i] for key, val in metrics.items()})

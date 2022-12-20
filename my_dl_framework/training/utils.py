@@ -97,8 +97,15 @@ class RSNAChallengeBinaryDataset(Dataset):
                 transform_list.append(transforms.RandomCrop(self.config['random_crop']))
             if self.config['random_fliplr'] is not None:
                 transform_list.append(transforms.RandomHorizontalFlip())
+            if self.config['color_jitter'] is not None:
+                transform_list.append(transforms.ColorJitter(
+                    brightness=0.5,
+                    contrast=0.5,
+                    saturation=0.2,
+                    hue=0.2
+                ))
         else:
-            if self.config['random_crop'] is not None:
+            if self.config['apply_center_crop_inf'] is not None:
                 transform_list.append(transforms.CenterCrop(self.config['random_crop']))
         self.all_transforms = transforms.Compose(transform_list)
 
@@ -127,11 +134,23 @@ class RSNAChallengeBinaryDataset(Dataset):
             label = 0
         else:
             raise ValueError(f"No label found for patient {base_file_name}")
+        # Add channels
+        image = np.concatenate((image, image, image), axis=0)
         # Data augmentation
         image = self.all_transforms(image)
-        # Add channels
-        image = torch.concat((image, image, image), dim=0)
+        # TODO: take repeat label and idx for testtime aug
         return idx, image, label
+
+
+def collate_aug_batch(batch):
+    """ Collates an augmented batch, i.e., when the dataset returns
+        returns multiple images at once.
+
+    :param batch: Uncollated batch
+    :return: collated batch
+    """
+    indices, imgs, targets = zip(*batch)
+    return torch.cat(indices), torch.cat(imgs),torch.cat(targets)
 
 
 def get_model(config: Dict) -> torch.nn.Module:

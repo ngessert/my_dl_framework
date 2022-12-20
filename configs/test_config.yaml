@@ -26,6 +26,9 @@ random_crop: 224
 random_fliplr: True
 continue_training: False
 ckpt_every_n_epochs: 2
+# Inference
+apply_center_crop_inf: True
+multi_crop_eval: None  # e.g. 3->9 crops
 # Validation settings:
 validate_every_x_epochs: 2
 validate_on_train_set: False
