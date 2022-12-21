@@ -55,6 +55,7 @@ def run_training(cmd_args):
     for cv_idx, (subset_train, subset_val) in enumerate(zip(training_subsets, validation_subsets)):
         print(f'Starting fold number {cv_idx+1}/{len(training_subsets)}')
         curr_subfolder_cv = os.path.join(curr_subfolder, "CV_" + str(cv_idx+1))
+        os.makedirs(curr_subfolder_cv, exist_ok=True)
         # Data
         dataset_train = get_dataset(config=config, image_dir=config["training_image_dir"], subset=subset_train,
                                     is_training=True)
@@ -67,7 +68,7 @@ def run_training(cmd_args):
                                   is_training=False)
         print(f'Size validation dataset {len(dataset_val)}')
 
-        dataloader_val = DataLoader(dataset=dataset_val, batch_size=config["batch_size"], shuffle=True,
+        dataloader_val = DataLoader(dataset=dataset_val, batch_size=config["batch_size"], shuffle=False,
                                     num_workers=8, pin_memory=True)
         if config['validate_on_train_set']:
             dataset_train_val = get_dataset(config=config, image_dir=config["training_image_dir"], subset=subset_train,
@@ -86,7 +87,6 @@ def run_training(cmd_args):
             dirpath=curr_subfolder_cv,
             filename='train-epoch{epoch:02d}',
             auto_insert_metric_name=False,
-            every_n_epochs=config["ckpt_every_n_epochs"]
         )
         pl.seed_everything(42, workers=True)
         trainer = pl.Trainer(devices=cmd_args.num_gpus,
@@ -101,12 +101,15 @@ def run_training(cmd_args):
                              fast_dev_run=cmd_args.fast_dev_run,
                              callbacks=[checkpoint_callback],
                              logger=pl_clearml_logger,
+                             limit_train_batches=20,
+                             log_every_n_steps=config["log_every_n_steps"]
                              )
         trainer.fit(model, dataloader_train, 
                     [dataloader_val] if dataloader_train_val is None else [dataloader_val, dataloader_train_val],
                     ckpt_path=os.path.join(curr_subfolder_cv, "last.ckpt") if config["continue_training"] else None)
         if task is not None:
             task.close()
+
 
 if __name__ == "__main__":
     argparser = argparse.ArgumentParser()

@@ -8,7 +8,7 @@ from typing import Dict, List, Tuple, Union
 from torch.utils.data import Dataset
 import torch
 from torchvision import transforms
-from torchvision import models as tv_models
+from torchvision.models import get_model
 import pandas as pd
 import numpy as np
 import pydicom
@@ -128,14 +128,14 @@ class RSNAChallengeBinaryDataset(Dataset):
             image = load_any_image(self.image_paths[idx])
         # Label from csv
         base_file_name = os.path.normpath(self.image_paths[idx]).split(os.path.sep)[-1].split(".")[0]
-        if base_file_name in self.labels['patientId']:
+        if (self.labels['patientId'].eq(base_file_name)).any():
             label = int(self.labels.loc[self.labels['patientId'] == base_file_name].iloc[0]['Target'])
         elif self.allow_missing_target:
             label = 0
         else:
             raise ValueError(f"No label found for patient {base_file_name}")
         # Add channels
-        image = np.concatenate((image, image, image), axis=0)
+        image = np.concatenate((image[:, :, None], image[:, :, None], image[:, :, None]), axis=2)
         # Data augmentation
         image = self.all_transforms(image)
         # TODO: take repeat label and idx for testtime aug
@@ -153,31 +153,15 @@ def collate_aug_batch(batch):
     return torch.cat(indices), torch.cat(imgs),torch.cat(targets)
 
 
-def get_model(config: Dict) -> torch.nn.Module:
+def get_tv_class_model(config: Dict) -> torch.nn.Module:
     """
-    Get a torch model
+    Get a torchvision classification model and replace output layer
     :param config:          Dict with config
     :return:                Torch model
     """
-    if "TV_" in config["model_name"]:
-        if config['model_name'] == "TV_densenet121":
-            model = tv_models.densenet121(pretrained=config['pretrained'])
-        if config['model_name'] == "TV_densenet161":
-            model = tv_models.densenet161(pretrained=config['pretrained'])
-        if config['model_name'] == "TV_densenet169":
-            model = tv_models.densenet169(pretrained=config['pretrained'])
-        if config['model_name'] == "TV_densenet201":
-            model = tv_models.densenet201(pretrained=config['pretrained'])
-        if config['model_name'] == "TV_efficientnet_v2_s":
-            model = tv_models.efficientnet_v2_s(pretrained=config['pretrained'])
-        if config['model_name'] == "TV_efficientnet_v2_m":
-            model = tv_models.efficientnet_v2_m(pretrained=config['pretrained'])
-        if config['model_name'] == "TV_efficientnet_v2_l":
-            model = tv_models.efficientnet_v2_l(pretrained=config['pretrained'])
-        in_features = model.classifier.in_features
-        model.classifier = torch.nn.Linear(in_features, config['num_classes'])
-    else:
-        raise ValueError(f'Unknown model name {config["model_name"]}')
+    model = get_model(config["classification_model_name"], weights="DEFAULT")
+    in_features = model.classifier.in_features
+    model.classifier = torch.nn.Linear(in_features, config['num_classes'])
     return model
 
 
