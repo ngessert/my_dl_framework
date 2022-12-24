@@ -1,8 +1,8 @@
 dataset_type: "RSNAChallengeBinary"
-base_path: "tests\\test_data\\rsna_binary"
+base_path: "tests/test_data/rsna_binary"
 class_names: ["Class0", "Class1"]
 # CV splitting
-data_split_file: "tests\\test_cv_splits\\cv_split_3fold.json"
+data_split_file: "tests/test_cv_splits/cv_split_3fold.json"
 run_cv_subset: [0, 1, 2]  # Specify a subset of CV splits to train
 csv_name: "stage_2_train_labels_test.csv"
 training_image_dir: "images"

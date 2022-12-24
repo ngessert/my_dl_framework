@@ -59,11 +59,11 @@ def run_training(config_path: str,
         task.connect(config)
     # Run Training
     # Setup CV
-    with open(config["data_split_file"], encoding="utf-8") as file:
+    with open(os.path.normpath(config["data_split_file"]), encoding="utf-8") as file:
         data_split = json.load(file)
     training_subsets = data_split["training_splits"]
     validation_subsets = data_split["validation_splits"]
-    curr_subfolder = os.path.join(config['base_path'], "experiments", config_path.replace("\\", "/").split("/")[-1])
+    curr_subfolder = os.path.join(os.path.normpath(config['base_path']), "experiments", config_path.replace("\\", "/").split("/")[-1])
     if config["continue_training"] is not None:
         curr_subfolder += config["continue_training"]
     else:

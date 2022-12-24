@@ -20,14 +20,14 @@ class RSNAChallengeBinaryDataset(Dataset):
         self.subset = subset
         self.allow_missing_target = allow_missing_target
         # Load labels
-        self.labels = pd.read_csv(os.path.join(self.config['base_path'], self.config['csv_name']))
+        self.labels = pd.read_csv(os.path.join(os.path.normpath(self.config['base_path']), self.config['csv_name']))
         # Get images
         if self.subset is not None:
-            self.image_paths = [file_name for file_name in glob(os.path.join(self.config['base_path'], image_dir, "*"))
+            self.image_paths = [file_name for file_name in glob(os.path.join(os.path.normpath(self.config['base_path']), image_dir, "*"))
                                 if os.path.isfile(file_name) and
                                 os.path.normpath(file_name).split(os.path.sep)[-1].split(".")[0] in self.subset]
         else:
-            self.image_paths = [file_name for file_name in glob(os.path.join(self.config['base_path'], image_dir, "*"))
+            self.image_paths = [file_name for file_name in glob(os.path.join(os.path.normpath(self.config['base_path']), image_dir, "*"))
                                 if os.path.isfile(file_name)]
         print("Len img paths", len(self.image_paths))
         self.images = list()
