@@ -60,23 +60,24 @@ class PLClassificationWrapper(pl.LightningModule):
         return {"loss": loss, "batch_idx": batch_idx}
 
     def training_step_end(self, step_output):
-        batch_idx = step_output["batch_idx"][0]
-        loss = torch.stack(step_output["loss"])
+        if isinstance(step_output, list):
+            stacked_dict = stack_list_of_dicts(step_output, ["loss"], to_numpy=False)
+            batch_idx = step_output[0]["batch_idx"]
+            loss = torch.mean(torch.stack(stacked_dict["loss"]))
+        else:
+            batch_idx = step_output["batch_idx"]
+            loss = step_output["loss"]
         # Track loss
-        if batch_idx % self.config["loss_log_freq"] == 0:
-            self.log("train_loss", loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
+        self.log("train_loss", loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
         return {"loss": loss, "batch_idx": batch_idx}
 
-    def validation_step(self, val_batch, batch_idx, **kwargs):
+    def validation_step(self, val_batch, batch_idx, dataloader_idx=0):
         indices, images, targets = val_batch
         outputs = F.softmax(self.model(images), dim=1)
         return_dict = {"outputs": outputs,
                        "targets": targets,
-                       "indices": indices}
-        if "dataloader_idx" in kwargs:
-            return_dict["dataloader_idx"] = kwargs["dataloader_idx"]
-        else:
-            return_dict["dataloader_idx"] = 0
+                       "indices": indices,
+                       "dataloader_idx": dataloader_idx}
         return return_dict
 
     def validation_step_end(self, step_output):

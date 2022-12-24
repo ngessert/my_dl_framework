@@ -23,6 +23,7 @@ from pytorch_lightning.utilities.logger import (
 from pytorch_lightning.utilities.rank_zero import rank_zero_only
 from clearml import Task
 
+
 class PLClearML(Logger):
     """ ClearML logger for pytorch lightning
     """
@@ -30,13 +31,15 @@ class PLClearML(Logger):
     LOGGER_JOIN_CHAR = "-"
 
     def __init__(
-        self,
-        task: Task,
-        save_dir: _PATH = ".",
-        log_model: bool = True
+            self,
+            task: Task,
+            name_base: str,
+            save_dir: _PATH = ".",
+            log_model: bool = True
     ) -> None:
         super().__init__()
         self.task = task
+        self.name_base = name_base
         self.logger = task.get_logger()
         self._save_dir = save_dir
         self._log_model = log_model
@@ -50,7 +53,7 @@ class PLClearML(Logger):
 
     @property
     def name(self) -> str:
-        return self.task.name
+        return self.name_base + "_" + self.task.name
 
     @property
     def version(self):
@@ -62,7 +65,6 @@ class PLClearML(Logger):
         params = _flatten_dict(params)
         params = _sanitize_callable_params(params)
         self.task.connect_configuration(params)
-
 
     @rank_zero_only
     def log_metrics(self, metrics: Mapping[str, float], step: Optional[int] = None) -> None:
@@ -76,28 +78,27 @@ class PLClearML(Logger):
                                       value=metrics[metric],
                                       iteration=step)
 
-
     @rank_zero_only
     def log_table(
-        self,
-        title: str,
-        dataframe: pd.DataFrame = None,
-        step: Optional[int] = None,
+            self,
+            title: str,
+            dataframe: pd.DataFrame = None,
+            step: Optional[int] = None,
     ) -> None:
         """Log a pandas table
         """
         if step is None:
             step = 0
         self.logger.report_table(title=title,
-                                         series=title,
-                                         iteration=step,
-                                         table_plot=dataframe)
+                                 series=title,
+                                 iteration=step,
+                                 table_plot=dataframe)
 
     @rank_zero_only
     def log_plotly(
-        self,
-        plotly_obj_dict: Dict[str, Any],
-        step: Optional[int] = None,
+            self,
+            plotly_obj_dict: Dict[str, Any],
+            step: Optional[int] = None,
     ) -> None:
         """ Log list of plotly objects to clearml.
         """
@@ -105,19 +106,18 @@ class PLClearML(Logger):
             step = 0
         for plot_name, plot in plotly_obj_dict.items():
             self.logger.report_plotly(title=plot_name,
-                                        series=plot_name,
-                                        figure=plot,
-                                        iteration=step)
+                                      series=plot_name,
+                                      figure=plot,
+                                      iteration=step)
 
     @rank_zero_only
     def log_text(
-        self,
-        message: str,
+            self,
+            message: str,
     ) -> None:
         """Log text in clearml.
         """
         self.logger.report_text(msg=message)
-
 
     @rank_zero_only
     def log_image(self, title: str, image, step: Optional[int] = None) -> None:
@@ -131,7 +131,6 @@ class PLClearML(Logger):
                                  image=image,
                                  iteration=step)
 
-
     @property
     def save_dir(self) -> Optional[str]:
         """Gets the save directory.
@@ -140,7 +139,6 @@ class PLClearML(Logger):
             The path to the save directory.
         """
         return self._save_dir
-
 
     def after_save_checkpoint(self, checkpoint_callback: ModelCheckpoint) -> None:
         # log checkpoints as artifacts
@@ -151,9 +149,9 @@ class PLClearML(Logger):
 
     @rank_zero_only
     def download_artifact(
-        self,
-        artifact: str,
-        save_dir: Optional[_PATH] = None,
+            self,
+            artifact: str,
+            save_dir: Optional[_PATH] = None,
     ) -> str:
         """Downloads an artifact from the clearml server.
 
@@ -168,7 +166,6 @@ class PLClearML(Logger):
         shutil.move(tmp_path, save_dir)
         return os.path.join(save_dir, tmp_path.split(os.sep)[-1])
 
-
     @rank_zero_only
     def finalize(self, status: str) -> None:
         if status != "success":
@@ -178,17 +175,17 @@ class PLClearML(Logger):
         if self._checkpoint_callback:
             self._scan_and_log_checkpoints(self._checkpoint_callback)
 
-
     def _scan_and_log_checkpoints(self, checkpoint_callback: ModelCheckpoint) -> None:
         # get checkpoints to be saved with associated score
         checkpoints = _scan_checkpoints(checkpoint_callback, self._logged_model_time)
 
         # log iteratively all new checkpoints
-        for ckpt_time, ckpt_path, ckpt_score, _ in checkpoints:
+        for ckpt_time, ckpt_path, ckpt_score, tag in checkpoints:
             metadata = (
                 {
                     "score": ckpt_score.item() if isinstance(ckpt_score, Tensor) else ckpt_score,
                     "original_filename": Path(ckpt_path).name,
+                    "tag": tag,
                     checkpoint_callback.__class__.__name__: {
                         k: getattr(checkpoint_callback, k)
                         for k in [
@@ -204,7 +201,7 @@ class PLClearML(Logger):
                     },
                 }
             )
-            self.task.upload_artifact(name=f"model-{self.task.name}",
+            self.task.upload_artifact(name=f"model-{self.name_base}-{tag}",
                                       artifact_object=ckpt_path,
                                       metadata=metadata)
             # remember logged models - timestamp needed in case filename didn't change (lastkckpt or custom name)

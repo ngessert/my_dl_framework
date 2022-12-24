@@ -10,6 +10,7 @@ Example:
 import argparse
 import json
 import os
+import shutil
 from datetime import datetime
 import yaml
 from torch.utils.data import DataLoader
@@ -20,39 +21,61 @@ import pytorch_lightning as pl
 from my_dl_framework.models.pl_wrapper import PLClassificationWrapper
 from my_dl_framework.training.utils import get_dataset
 from my_dl_framework.utils.pytorch_lightning.clearml_logger import PLClearML
+from my_dl_framework.utils.pytorch_lightning.minibatch_plot_callback import MBPlotCallback
 
-def run_training(cmd_args):
-    """ Run pytorch lightning training
+
+def run_training(config: str,
+                 clearml: bool,
+                 num_gpus: int,
+                 multi_gpu_strat: str,
+                 remote: bool,
+                 fast_dev_run: bool):
+    """
+    Run pytorch lightning training
+    :param config:              Path to config file
+    :param clearml:             Whther to use clearml
+    :param num_gpus:            Number of GPUs to use
+    :param multi_gpu_strat:     Pytorch lightning GPU strat (e.g. dpp)
+    :param remote:              Whether job is being executed remotely (auto-set by clearml)
+    :param fast_dev_run:        Pytorch lighning dev-run option
+    :return:
     """
     # Import config
-    with open(cmd_args.config, encoding="utf-8") as file:
+    with open(config, encoding="utf-8") as file:
         config = yaml.safe_load(file)
-        print(f'Using config {cmd_args.config}')
+        print(f'Using config {config}')
     # ClearML
-    if cmd_args.clearml:
-        if cmd_args.remote:
-            task = Task.get_task(project_name="RSNABinary", task_name=cmd_args.config.split(os.sep)[-1])  # ?
+    task = None
+    task_prev = None
+    if clearml:
+        if remote:
+            task = Task.get_task(project_name="RSNABinary", task_name=config.split(os.sep)[-1])  # ?
         else:
             task = Task.init(project_name='RSNABinary',
-                             task_name=cmd_args.config.split(os.sep)[-1],
+                             task_name=config.split(os.sep)[-1],
                              reuse_last_task_id=False,
                              auto_connect_frameworks={'matplotlib': False}
                              )
-        task.connect_configuration(config)
-        pl_clearml_logger = PLClearML(task=task)
-    else:
-        pl_clearml_logger = None
-        task = None
+            if config["continue_training_from_clearml"] is not None:
+                task_prev = Task.get_task(task_id=config["continue_training_from_clearml"])
+                print(f'Use ckpts from task {config["continue_training_from_clearml"]}')
+        task.connect(config)
     # Run Training
     # Setup CV
     with open(config["data_split_file"], encoding="utf-8") as file:
         data_split = json.load(file)
     training_subsets = data_split["training_splits"]
     validation_subsets = data_split["validation_splits"]
-    curr_subfolder = os.path.join(config['base_path'], "experiments", cmd_args.config.replace("\\", "/").split("/")[-1])
-    if os.path.exists(curr_subfolder) and not config["continue_training"]:
+    curr_subfolder = os.path.join(config['base_path'], "experiments", config.replace("\\", "/").split("/")[-1])
+    if config["continue_training"] is not None:
+        curr_subfolder += config["continue_training"]
+    else:
         curr_subfolder += datetime.now().strftime("%d-%m-%Y-%H-%M-%S")
     for cv_idx, (subset_train, subset_val) in enumerate(zip(training_subsets, validation_subsets)):
+        if config["run_cv_subset"] is not None:
+            # Skip CV folds that are not selected
+            if cv_idx not in config["run_cv_subset"]:
+                continue
         print(f'Starting fold number {cv_idx+1}/{len(training_subsets)}')
         curr_subfolder_cv = os.path.join(curr_subfolder, "CV_" + str(cv_idx+1))
         os.makedirs(curr_subfolder_cv, exist_ok=True)
@@ -81,34 +104,53 @@ def run_training(cmd_args):
         model = PLClassificationWrapper(config=config,
                                         training_set_len=len(dataset_train))
         checkpoint_callback = pl.callbacks.ModelCheckpoint(
-            monitor=None,
+            monitor=config["val_best_metric"],
             save_last=True,
-            save_top_k=0,
+            save_top_k=1,
             dirpath=curr_subfolder_cv,
-            filename='train-epoch{epoch:02d}',
-            auto_insert_metric_name=False,
+            filename='train-{epoch:02d}-{' + config["val_best_metric"] + ':.4f}',
+            mode=config["val_best_target"],
+            auto_insert_metric_name=True,
+            every_n_epochs=config["ckpt_every_n_epochs"],
         )
+        # we also want local logs
+        csv_logger = pl.loggers.CSVLogger(curr_subfolder_cv, name="local_logs")
+        if task is not None:
+            pl_clearml_logger = PLClearML(task=task, name_base="CV" + str(cv_idx+1))
+        else:
+            pl_clearml_logger = None
         pl.seed_everything(42, workers=True)
-        trainer = pl.Trainer(devices=cmd_args.num_gpus,
+        trainer = pl.Trainer(devices=num_gpus,
                              check_val_every_n_epoch=config["validate_every_x_epochs"],
                              default_root_dir=curr_subfolder_cv,
                              accelerator="auto",
                              max_epochs=config["num_epochs"],
-                             auto_select_gpus=True if cmd_args.num_gpus is None else False,
-                             strategy=cmd_args.multi_gpu_strat,
+                             auto_select_gpus=True if num_gpus is None else False,
+                             strategy=multi_gpu_strat,
                              precision=16,
                              deterministic=True,
-                             fast_dev_run=cmd_args.fast_dev_run,
-                             callbacks=[checkpoint_callback],
-                             logger=pl_clearml_logger,
+                             fast_dev_run=fast_dev_run,
+                             callbacks=[checkpoint_callback, MBPlotCallback(curr_subfolder_cv, config)],
+                             logger=[pl_clearml_logger, csv_logger] if pl_clearml_logger is not None else csv_logger,
                              limit_train_batches=20,
-                             log_every_n_steps=config["log_every_n_steps"]
+                             limit_val_batches=config["max_num_batches_val"],
+                             log_every_n_steps=config["loss_log_freq"]
                              )
+        # Load checkpoint if training is continued and ckpt exists
+        if config["continue_training"] is not None and os.path.isfile(os.path.join(curr_subfolder_cv, "last.ckpt")):
+            ckpt_path = os.path.join(curr_subfolder_cv, "last.ckpt")
+        elif task_prev is not None:
+            print("No local ckpt found, getting ckpt from ClearML")
+            ckpt_path = os.path.join(curr_subfolder_cv, "last.ckpt")
+            ckpt_path_tmp = task_prev.artifacts[f"model-CV{cv_idx+1}-latest"].get_local_copy()
+            shutil.copy(ckpt_path_tmp, ckpt_path)
+        else:
+            ckpt_path = None
         trainer.fit(model, dataloader_train, 
                     [dataloader_val] if dataloader_train_val is None else [dataloader_val, dataloader_train_val],
-                    ckpt_path=os.path.join(curr_subfolder_cv, "last.ckpt") if config["continue_training"] else None)
-        if task is not None:
-            task.close()
+                    ckpt_path=ckpt_path)
+    if task is not None:
+        task.close()
 
 
 if __name__ == "__main__":
@@ -121,4 +163,9 @@ if __name__ == "__main__":
     argparser.add_argument('-fd', '--fast_dev_run', type=int, default=None, help="test only x batches")
     args = argparser.parse_args()
     print(f'Args: {args}')
-    run_training(args)
+    run_training(config=args.config,
+                 clearml=args.clearml,
+                 num_gpus=args.num_gpus,
+                 multi_gpu_strat=args.multi_gpu_strat,
+                 remote=args.remote,
+                 fast_dev_run=args.fast_dev_run)
