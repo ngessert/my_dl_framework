@@ -1,0 +1,24 @@
+{
+    "validation_splits": [
+        [
+            "0004cfab-14fd-4e49-80ba-63a80b6bddd6",
+            "00322d4d-1c29-4943-afc9-b6754be640eb",
+            "00436515-870c-4b36-a041-de91049b9ab4"
+        ],
+        [
+            "00313ee0-9eaa-42f4-b0ab-c148ed3241cd",
+            "003d8fa0-6bf1-40ed-b54c-ac657f8495c5",
+            "00436515-870c-4b36-a041-de91049b9ab4"
+        ]
+    ],
+    "training_splits": [
+        [
+            "00313ee0-9eaa-42f4-b0ab-c148ed3241cd",
+            "003d8fa0-6bf1-40ed-b54c-ac657f8495c5"
+        ],
+        [
+            "0004cfab-14fd-4e49-80ba-63a80b6bddd6",
+            "00322d4d-1c29-4943-afc9-b6754be640eb"
+        ]
+    ]
+}

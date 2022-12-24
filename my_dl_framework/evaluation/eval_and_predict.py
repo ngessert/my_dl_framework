@@ -3,7 +3,7 @@ Options:
     --folder=<folder>     folder to run prediction on
     -cl --clearml         use clearml.
 Example:
-    python my_dl_framework\\evaluation\\predict.py --folder=C:\\data\\RSNA_challenge\\experiments\\test_config.yaml20-02-2022-20-38-12 -cl clearml
+    python my_dl_framework\\evaluation\\eval_and_predict.py --folder=C:\\data\\RSNA_challenge\\experiments\\test_config.yaml20-02-2022-20-38-12 -cl clearml
 """
 
 import argparse

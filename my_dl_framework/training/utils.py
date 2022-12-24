@@ -2,155 +2,17 @@
 Training utility stuff
 """
 import os
-from glob import glob
 import json
-from typing import Dict, List, Tuple, Union
+from typing import Dict, Tuple
 from torch.utils.data import Dataset
 import torch
-from torchvision import transforms
 from torchvision.models import get_model
 import pandas as pd
 import numpy as np
-import pydicom
 import plotly
 from clearml import Logger
 import matplotlib.pyplot as plt
 from my_dl_framework.evaluation.utils import validate_model_classification
-
-
-def get_dataset(config: Dict, image_dir: str, subset: Union[List[str], None], is_training: bool) -> Dataset:
-    """
-    Getter for a torch dataset
-    :param config:          Dict with config
-    :param image_dir:       Path where the images are located
-    :param subset:          Subset to select
-    :param is_training:     Whether training mode is active (e.g. for data augmentation)
-    :return:                A torch dataset
-    """
-    if config["dataset_type"] == "RSNAChallengeBinary":
-        return RSNAChallengeBinaryDataset(config=config, image_dir=image_dir, subset=subset, is_training=is_training)
-    else:
-        raise ValueError(f'Unknown dataset type {config["dataset_type"]}')
-
-
-def load_any_image(image_path: str) -> np.ndarray:
-    """
-    Loader for different images types, currently supports:
-    *.dcm
-    :param image_path:      Path to the image to load
-    :return:                The image as numpy array
-    """
-    if image_path.endswith(".dcm"):
-        dicom = pydicom.dcmread(image_path)
-        image = dicom.pixel_array
-    else:
-        raise ValueError(f'Unknown image type {image_path}')
-    return image
-
-
-class ZeroOneNorm:
-    """
-    0-1 norm for torch Tensors
-    """
-    def __init__(self):
-        pass
-
-    def __call__(self, image: torch.Tensor) -> torch.Tensor:
-        min_val, _ = torch.min(image.flatten(), dim=0)
-        max_val, _ = torch.max(image.flatten(), dim=0)
-        image = (image - min_val) / (max_val - min_val)
-        return image
-
-
-class RSNAChallengeBinaryDataset(Dataset):
-    """
-    Dataset for RSNA challenge classification task
-    """
-    def __init__(self, config: Dict, image_dir: str, subset: Union[List[str], None], is_training: bool, allow_missing_target: bool = False):
-        self.config = config
-        self.is_training = is_training
-        self.subset = subset
-        self.allow_missing_target = allow_missing_target
-        # Load labels
-        self.labels = pd.read_csv(os.path.join(self.config['base_path'], self.config['csv_name']))
-        # Get images
-        if self.subset is not None:
-            self.image_paths = [file_name for file_name in glob(os.path.join(self.config['base_path'], image_dir, "*"))
-                                if os.path.isfile(file_name) and
-                                os.path.normpath(file_name).split(os.path.sep)[-1].split(".")[0] in self.subset]
-        else:
-            self.image_paths = [file_name for file_name in glob(os.path.join(self.config['base_path'], image_dir, "*"))
-                                if os.path.isfile(file_name)]
-        print("Len img paths", len(self.image_paths))
-        self.images = list()
-        if self.config['preload_images']:
-            for image_path in self.image_paths:
-                self.images.append(load_any_image(image_path))
-        # Set up data augmentation
-        transform_list = list()
-        transform_list.append(transforms.ToTensor())
-        transform_list.append(ZeroOneNorm())
-        if self.config['resize_images'] is not None:
-            transform_list.append(transforms.Resize(self.config['resize_images']))
-        if self.is_training:
-            if self.config['random_crop'] is not None:
-                transform_list.append(transforms.RandomCrop(self.config['random_crop']))
-            if self.config['random_fliplr'] is not None:
-                transform_list.append(transforms.RandomHorizontalFlip())
-            if self.config['color_jitter'] is not None:
-                transform_list.append(transforms.ColorJitter(
-                    brightness=0.5,
-                    contrast=0.5,
-                    saturation=0.2,
-                    hue=0.2
-                ))
-        else:
-            if self.config['apply_center_crop_inf'] is not None:
-                transform_list.append(transforms.CenterCrop(self.config['random_crop']))
-        self.all_transforms = transforms.Compose(transform_list)
-
-    def __len__(self):
-        """
-        Length of the dataset
-        :return:    length
-        """
-        return len(self.image_paths)
-
-    def __getitem__(self, idx: int) -> Tuple[int, torch.Tensor, int]:
-        """
-        Returns an image and label based on an index
-        :param idx:         Index
-        :return:
-        """
-        if self.config['preload_images']:
-            image = self.images[idx]
-        else:
-            image = load_any_image(self.image_paths[idx])
-        # Label from csv
-        base_file_name = os.path.normpath(self.image_paths[idx]).split(os.path.sep)[-1].split(".")[0]
-        if (self.labels['patientId'].eq(base_file_name)).any():
-            label = int(self.labels.loc[self.labels['patientId'] == base_file_name].iloc[0]['Target'])
-        elif self.allow_missing_target:
-            label = 0
-        else:
-            raise ValueError(f"No label found for patient {base_file_name}")
-        # Add channels
-        image = np.concatenate((image[:, :, None], image[:, :, None], image[:, :, None]), axis=2)
-        # Data augmentation
-        image = self.all_transforms(image)
-        # TODO: take repeat label and idx for testtime aug
-        return idx, image, label
-
-
-def collate_aug_batch(batch):
-    """ Collates an augmented batch, i.e., when the dataset returns
-        returns multiple images at once.
-
-    :param batch: Uncollated batch
-    :return: collated batch
-    """
-    indices, imgs, targets = zip(*batch)
-    return torch.cat(indices), torch.cat(imgs),torch.cat(targets)
 
 
 def get_tv_class_model(config: Dict) -> torch.nn.Module:
@@ -208,28 +70,6 @@ def get_lr_scheduler(config: Dict, optimizer: torch.optim.Optimizer):
     else:
         raise ValueError(f'Unknown lr scheduler name {config["lr_scheduler"]}')
     return lr_scheduler
-
-
-def save_optimizer_and_model(optimizer: torch.optim.Optimizer, model: torch.nn.Module, curr_subfolder:str, epoch: int, prefix: str):
-    """
-    Saves an optimizer and model
-    :param optimizer:           Torch optimizer
-    :param model:               Torch model
-    :param curr_subfolder:      Subfolder to save in
-    :param epoch:               Current epoch
-    :param prefix:              Prefix in name
-    :return: None
-    """
-    # Save model/optimizer
-    state_opt = {'state_dict': optimizer.state_dict()}
-    torch.save(state_opt, os.path.join(curr_subfolder, prefix + "_optimizer_ckpt_" + str(epoch) + ".pt"))
-    state_model = {'state_dict': model.state_dict()}
-    torch.save(state_model, os.path.join(curr_subfolder, prefix + "_model_ckpt_" + str(epoch) + ".pt"))
-    # Remove previous one
-    if os.path.exists(os.path.join(curr_subfolder, prefix + "_optimizer_ckpt_" + str(epoch - 1) + ".pt")):
-        os.remove(os.path.join(curr_subfolder, prefix + "_optimizer_ckpt_" + str(epoch - 1) + ".pt"))
-    if os.path.exists(os.path.join(curr_subfolder, prefix + "_model_ckpt_" + str(epoch - 1) + ".pt")):
-        os.remove(os.path.join(curr_subfolder, prefix + "_model_ckpt_" + str(epoch - 1) + ".pt"))
 
 
 def get_and_log_metrics_classification(eval_name: str,
@@ -306,12 +146,14 @@ def plot_example_batch(images: torch.Tensor, targets: torch.Tensor, idx: int, sa
     for i in range(batch_size):
         image = images[i, 0, :, :].numpy()
         target = config["class_names"][targets[i].item()]
-        Logger.current_logger().report_image(
-            f"{i} of {idx} y={target}",
-            "debug example",
-            iteration=0,
-            image=image,
-        )
+        clearml_logger = Logger.current_logger()
+        if clearml_logger is not None:
+            clearml_logger.report_image(
+                f"{i} of {idx} y={target}",
+                "debug example",
+                iteration=0,
+                image=image,
+            )
         axes[i].imshow(image, cmap="gray")
         axes[i].set_title(f'Target {target}', fontsize=5)
         axes[i].set_axis_off()

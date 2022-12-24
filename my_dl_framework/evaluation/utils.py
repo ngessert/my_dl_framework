@@ -30,7 +30,11 @@ def get_roc_curve(class_names: List[str], predictions: np.ndarray, targets: np.n
         y_true = np.array(targets == i).astype(int)
 
         fpr, tpr, _ = roc_curve(y_true, y_score)
-        auc_score = roc_auc_score(y_true, y_score)
+        try:
+            auc_score = roc_auc_score(y_true, y_score)
+        except ValueError as e:
+            auc_score = 0.0
+            print(f"Warning: no AUC caluclated, error: {e}")
         auc_scores.append(auc_score)
         name = f"{class_names[i]} (AUC={auc_score:.2f})"
         fig.add_trace(go.Scatter(x=fpr, y=tpr, name=name, mode='lines'))
@@ -46,6 +50,12 @@ def get_roc_curve(class_names: List[str], predictions: np.ndarray, targets: np.n
 
 
 def get_confusion_matrix(conf_matrix: np.ndarray, class_names: List[str]) -> go.Figure:
+    """
+    Create confusion matrix plotly pot
+    :param conf_matrix:         Confusion matrix as numpy array
+    :param class_names:         Class names
+    :return:
+    """
     # invert z idx values
     z = conf_matrix[::-1]
 
@@ -70,10 +80,9 @@ def get_confusion_matrix(conf_matrix: np.ndarray, class_names: List[str]) -> go.
                             y=-0.15,
                             showarrow=False,
                             text="Predicted value",
-                            # xref="paper",
-                            # yref="paper"
                             ))
     return fig
+
 
 def calculate_metrics(predictions: np.ndarray, 
                       targets: np.ndarray,
@@ -83,12 +92,16 @@ def calculate_metrics(predictions: np.ndarray,
     """
     metrics = dict()
     plots = dict()
-    log_loss_value = log_loss(targets, predictions)
+    try:
+        log_loss_value = log_loss(targets, predictions)
+    except ValueError as e:
+        log_loss_value = 100
+        print(f"Warning: no log loss caluclated, error: {e}")
     log_loss_value = np.repeat(log_loss_value, len(class_names) +1)
     accuracy = np.zeros([len(class_names) + 1])
     accuracy[:-1] = np.mean(np.equal(np.argmax(predictions, 1), targets))
     accuracy[-1] = np.mean(accuracy[:-1])
-    conf_matrix = confusion_matrix(targets, np.argmax(predictions, 1))
+    conf_matrix = confusion_matrix(targets, np.argmax(predictions, 1), labels=np.arange(len(class_names)))
     plots["confusion_matrix"] = get_confusion_matrix(conf_matrix=conf_matrix, class_names=class_names)
     # Sensitivity / Specificity
     sensitivity = np.zeros([len(class_names) + 1])
@@ -131,7 +144,7 @@ def validate_model_classification(model: torch.nn.Module,
                                   dataloader: DataLoader,
                                   config: Dict,
                                   max_num_batches: int = None,
-                                  use_cleaml: bool = True) -> Tuple[Dict, List, np.ndarray, np.ndarray]:
+                                  use_cleaml: bool = True) -> Tuple[Dict, Dict, np.ndarray, np.ndarray]:
     """
     Validates a model using data from a dataloader
     :param model:           Torch model

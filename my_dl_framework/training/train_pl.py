@@ -1,10 +1,6 @@
-"""Training script.
-Options:
-    -h --help            show this message and exit.
-    --config=<config>    config name to run.
-    -cl --clearml         use clearml.
+"""Main Training script with pytorch lightning.
 Example:
-    python my_dl_framework\\training\\train.py --config=C:\\sources\\my_dl_framework\\configs\\test_config.yaml -cl clearml
+    python my_dl_framework\\training\\train_pl.py --config=C:\\sources\\my_dl_framework\\configs\\test_config.yaml -cl clearml
 """
 
 import argparse
@@ -17,22 +13,23 @@ from torch.utils.data import DataLoader
 
 from clearml import Task
 import pytorch_lightning as pl
+from typing import Union
 
+from my_dl_framework.data.get_dataset import get_dataset
 from my_dl_framework.models.pl_wrapper import PLClassificationWrapper
-from my_dl_framework.training.utils import get_dataset
 from my_dl_framework.utils.pytorch_lightning.clearml_logger import PLClearML
 from my_dl_framework.utils.pytorch_lightning.minibatch_plot_callback import MBPlotCallback
 
 
-def run_training(config: str,
+def run_training(config_path: str,
                  clearml: bool,
-                 num_gpus: int,
-                 multi_gpu_strat: str,
+                 num_gpus: Union[int, None],
+                 multi_gpu_strat: Union[str, None],
                  remote: bool,
                  fast_dev_run: bool):
     """
     Run pytorch lightning training
-    :param config:              Path to config file
+    :param config_path:              Path to config file
     :param clearml:             Whther to use clearml
     :param num_gpus:            Number of GPUs to use
     :param multi_gpu_strat:     Pytorch lightning GPU strat (e.g. dpp)
@@ -41,18 +38,18 @@ def run_training(config: str,
     :return:
     """
     # Import config
-    with open(config, encoding="utf-8") as file:
+    with open(config_path, encoding="utf-8") as file:
         config = yaml.safe_load(file)
-        print(f'Using config {config}')
+        print(f'Using config {config_path}')
     # ClearML
     task = None
     task_prev = None
     if clearml:
         if remote:
-            task = Task.get_task(project_name="RSNABinary", task_name=config.split(os.sep)[-1])  # ?
+            task = Task.get_task(project_name="RSNABinary", task_name=config_path.split(os.sep)[-1])  # ?
         else:
             task = Task.init(project_name='RSNABinary',
-                             task_name=config.split(os.sep)[-1],
+                             task_name=config_path.split(os.sep)[-1],
                              reuse_last_task_id=False,
                              auto_connect_frameworks={'matplotlib': False}
                              )
@@ -66,7 +63,7 @@ def run_training(config: str,
         data_split = json.load(file)
     training_subsets = data_split["training_splits"]
     validation_subsets = data_split["validation_splits"]
-    curr_subfolder = os.path.join(config['base_path'], "experiments", config.replace("\\", "/").split("/")[-1])
+    curr_subfolder = os.path.join(config['base_path'], "experiments", config_path.replace("\\", "/").split("/")[-1])
     if config["continue_training"] is not None:
         curr_subfolder += config["continue_training"]
     else:
@@ -163,7 +160,7 @@ if __name__ == "__main__":
     argparser.add_argument('-fd', '--fast_dev_run', type=int, default=None, help="test only x batches")
     args = argparser.parse_args()
     print(f'Args: {args}')
-    run_training(config=args.config,
+    run_training(config_path=args.config,
                  clearml=args.clearml,
                  num_gpus=args.num_gpus,
                  multi_gpu_strat=args.multi_gpu_strat,
