@@ -1,4 +1,5 @@
 pytest
+pylint
 pip
 tqdm
 torch==1.13.0
