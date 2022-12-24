@@ -22,8 +22,6 @@ jobs:
           python setup.py develop
       - name: Pylint
         run: pylint --fail-under=5.0 my_dl_framework
-      - name: Dependencies
-        run:  pip-licenses
       - name: Test with pytest
         run: |
           pytest --cov-report xml --cov=my_dl_framework tests/
