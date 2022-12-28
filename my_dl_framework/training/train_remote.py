@@ -1,27 +1,31 @@
 """Training script for remote ClearML execution.
 Usage:
-    train.py --config=<config> [-htvpc]
+    train_remote.py --config=<config>
 
 Options:
     --config=<config>    config name to run.
-    -cl --clearml         use clearml.
 Example:
-    python my_dl_framework\\training\\train.py --config=C:\\sources\\my_dl_framework\\configs\\test_config.yaml -tc
+    python my_dl_framework\\training\\train_remote.py --config=C:\\sources\\my_dl_framework\\configs\\test_config.yaml
 """
 import os
-from clearml import Task, TaskTypes
 import argparse
+from clearml import Task, TaskTypes
 
 
-def train_remote(args):
+def train_remote(cmd_args):
+    """ Execute remote job by enqueing it to a clearml queue
+    """
+    # Add arguments
+    cmd_args["clearml"] = True
+    cmd_args["remote"] = True
     # Define tas
     task = Task.create(project_name='RSNABinary',
-                       task_name=args.config.split(os.sep)[-1],
+                       task_name=cmd_args.config.split(os.sep)[-1],
                        task_type=TaskTypes.training,
                        repo="https://github.com/ngessert/my_dl_framework",
-                       branch="develop",
-                       script="./my_dl_framework/training/train.py",
-                       argparse_args=[(key, value) for key, value in vars(args).items()],
+                       branch=cmd_args.branch,
+                       script="./my_dl_framework/training/train_pl.py",
+                       argparse_args=[(key, value) for key, value in vars(cmd_args).items()],
                      )
     Task.enqueue(task=task, queue_name="default")
 
@@ -29,7 +33,7 @@ def train_remote(args):
 if __name__ == "__main__":
     argparser = argparse.ArgumentParser()
     argparser.add_argument('-c', '--config', type=str, help='Config path', required=True)
-    argparser.add_argument('-cl', '--clearml', type=bool, default=False, help='Whether to use clearml', required=False)
+    argparser.add_argument('-b', '--branch', type=str, help='Branch', required=False, default="develop")
     args = argparser.parse_args()
     print(f'Args {args}')
     train_remote(args)

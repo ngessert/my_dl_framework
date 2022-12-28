@@ -7,24 +7,22 @@ Options:
     --num_cv=<num_cv>           Number of cv splits
     --save_path=<save_path>     file.json containing the defined splits
 Example:
-    python my_dl_framework\\data_handling\\define_cv_split_rsnachallenge.py --num_cv=3 --save_path=C:\\sources\\my_dl_framework\\cv_splits\\cv_split_3fold.json
+    python my_dl_framework\\data\\define_cv_split_rsnachallenge.py --num_cv=3 --save_path=C:\\sources\\my_dl_framework\\cv_splits\\cv_split_3fold.json
 """
+import argparse
 
-from docopt import docopt
 import pandas as pd
-import numpy as np
 import os
 import json
 
 
-def main():
-    args = docopt(__doc__)
-    num_cv = int(args["--num_cv"])
-    labels = pd.read_csv(os.path.join(r"C:\data\RSNA_challenge", "stage_2_train_labels.csv"))
+def main(num_cv: int,
+         save_path: str):
+    # labels = pd.read_csv(os.path.join(r"C:\data\RSNA_challenge", "stage_2_train_labels.csv"))
+    labels = pd.read_csv(os.path.join(r"C:\sources\my_dl_framework\tests\test_data\rsna_binary", "stage_2_train_labels_test.csv"))
     all_cases = labels['patientId'].tolist()
     # For balancing
     all_targets = labels['Target'].tolist()
-    num_classes = len(np.unique(all_targets))
     cases_per_class = dict()
     for target, case in zip(all_targets, all_cases):
         if target not in cases_per_class:
@@ -44,9 +42,15 @@ def main():
     for cv_split in range(num_cv):
         cv_cases_dict["training_splits"][cv_split] = [case for case in all_cases if case not in cv_cases_dict["validation_splits"][cv_split]]
     # Save
-    with open(os.path.normpath(args["--save_path"]), "w") as f:
+    with open(os.path.normpath(save_path), "w") as f:
         json.dump(cv_cases_dict, f, indent=4)
 
 
 if __name__ == "__main__":
-    main()
+    argparser = argparse.ArgumentParser()
+    argparser.add_argument('-n', '--num_cv', type=int, help='Number of CV splits', required=True)
+    argparser.add_argument('-s', '--save_path', type=str, help='Save dir', required=True)
+    args = argparser.parse_args()
+    print(f'Args: {args}')
+    main(num_cv=args.num_cv,
+         save_path=args.save_path)

@@ -1,5 +1,9 @@
 name: Python tests
-on: [push]
+on:
+  pull_request:
+    branches: [develop, main]
+  push:
+    branches: [develop, main]
 
 jobs:
   build:
@@ -8,18 +12,16 @@ jobs:
 
     steps:
       - uses: actions/checkout@v2
-      - name: Set up Python 3.8
+      - name: Set up Python 3.9
         uses: actions/setup-python@v2
         with:
-          python-version: 3.8
+          python-version: 3.9
       - name: Install dependencies
         run: |
           pip install -r requirements.txt
           python setup.py develop
-#      - name: Lint with flake8
-#        run: |
-#          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-#          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+      - name: Pylint
+        run: pylint --fail-under=5.0 my_dl_framework
       - name: Test with pytest
         run: |
           pytest --cov-report xml --cov=my_dl_framework tests/

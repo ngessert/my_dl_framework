@@ -1,10 +1,10 @@
 pytest
+pylint
 pip
 tqdm
--f https://download.pytorch.org/whl/cu102/torch_stable.html
-torch==1.9.0+cu102
--f https://download.pytorch.org/whl/cu102/torch_stable.html
-torchvision==0.10.0+cu102
+torch==1.13.0
+pytorch-lightning
+torchvision==0.14.0
 pytest-cov
 pyyaml
 clearml

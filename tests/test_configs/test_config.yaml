@@ -1,22 +1,22 @@
 dataset_type: "RSNAChallengeBinary"
-base_path: "C:\\data\\RSNA_challenge"
+base_path: "tests/test_data/rsna_binary"
 class_names: ["Class0", "Class1"]
 # CV splitting
-data_split_file: "C:\\sources\\my_dl_framework\\cv_splits\\cv_split_3fold.json"
+data_split_file: "tests/test_cv_splits/cv_split_3fold.json"
 run_cv_subset: [0, 1, 2]  # Specify a subset of CV splits to train
-csv_name: "stage_2_train_labels.csv"
-training_image_dir: "training_images"
+csv_name: "stage_2_train_labels_test.csv"
+training_image_dir: "images"
 # Training settings
-batch_size: 16
+batch_size: 2
 lr_scheduler: "stepwise"
 step_size: 50
 lr_step: 2
-num_epochs: 4
+num_epochs: 1
 optimizer: "Adam"
 learning_rate: 0.00005
 loss_name: "cross_entropy"
-loss_log_freq: 5
-num_batch_examples: 2
+loss_log_freq: 1
+num_batch_examples: 1
 # Model settings
 classification_model_name: "densenet121"
 pretrained: True
@@ -27,7 +27,7 @@ random_crop: 224
 random_fliplr: True
 color_jitter: True
 continue_training: null  # null or the timestamp
-continue_training_from_clearml: ef8d677e02534ea19a03c2cc1a63ca5c # null or clearml ID
+continue_training_from_clearml: null # null or clearml ID
 ckpt_every_n_epochs: 1
 # Inference
 apply_center_crop_inf: True
@@ -36,6 +36,6 @@ multi_crop_eval: None  # e.g. 3->9 crops
 validate_every_x_epochs: 1
 validate_on_train_set: False
 test_aug_ensemble_mode: mean
-max_num_batches_val: 10
+max_num_batches_val: 1
 val_best_metric: auc_score_mean
 val_best_target: max
