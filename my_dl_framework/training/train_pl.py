@@ -154,7 +154,7 @@ if __name__ == "__main__":
     argparser = argparse.ArgumentParser()
     argparser.add_argument('-c', '--config', type=str, help='Config path', required=True)
     argparser.add_argument('-cl', '--clearml', type=bool, default=False, help='Whether to use clearml', required=False)
-    argparser.add_argument('-ng', '--num_gpus', type=int, default=1, help="Number of GPUs to use")
+    argparser.add_argument('-ng', '--num_gpus', type=int, default=None, help="Number of GPUs to use")
     argparser.add_argument('-st', '--multi_gpu_strat', type=str, default=None, help="MultiGPU strat, e.g. ddp")
     argparser.add_argument('-r', '--remote', type=bool, default=False, help='Whether remote execution is done remote', required=False)
     argparser.add_argument('-fd', '--fast_dev_run', type=int, default=None, help="test only x batches")

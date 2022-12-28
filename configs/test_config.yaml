@@ -27,7 +27,7 @@ random_crop: 224
 random_fliplr: True
 color_jitter: True
 continue_training: null  # null or the timestamp
-continue_training_from_clearml: ef8d677e02534ea19a03c2cc1a63ca5c # null or clearml ID
+continue_training_from_clearml: null # null or clearml ID
 ckpt_every_n_epochs: 1
 # Inference
 apply_center_crop_inf: True
