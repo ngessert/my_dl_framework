@@ -9,24 +9,24 @@ It is focused on challenge scenarios where the goal is to train many models that
 Many components in this repo are inspired by my challenge-winning code repo that can be found here: `ISIC Challenge Code <https://github.com/ngessert/isic2019/>`_
 
 Features:
-* Based on `Pytorch Lightning <https://www.pytorchlightning.ai>`_
-* Experiment tracking with `ClearML <https://clear.ml>`_ - a powerful MLops tool
-* A training config system with yaml files
-* Job scheduling with ClearML workers & queues
-* Test-time augmentation
-* Evaluation & ensembling (also with ClearML artifacts)
-* Supported tasks:
-    * Image classification
-* Supported datasets:
-    * RSNA Chest X-ray Challenge (binary classification)
+    * Based on `Pytorch Lightning <https://www.pytorchlightning.ai>`_.
+    * Experiment tracking with `ClearML <https://clear.ml>`_ - a powerful MLops tool.
+    * A training config system with yaml files.
+    * Job scheduling with ClearML workers & queues.
+    * Test-time augmentation.
+    * Evaluation & ensembling (also with ClearML artifacts).
+    * Supported tasks:
+        * Image classification.
+    * Supported datasets:
+        * RSNA Chest X-ray Challenge (binary classification).
 
 
 Planned features:
-* Supported tasks:
-    * Image segmentation
-    * Image bounding box detection
-* Supported datasets:
-    * ISIC Skin Lesion Classification Challenge
+    * Supported tasks:
+        * Image segmentation.
+        * Image bounding box detection.
+    * Supported datasets:
+        * ISIC Skin Lesion Classification Challenge.
 
 
 :Documentation:
@@ -38,11 +38,11 @@ Planned features:
 Getting Started
 =============================
 
-Setup a new python environment, e.g. with virtual env or miniforge. The recommended python version is 3.9 (that's what I tested). Then, install the requirements with:
+Setup a new python environment, e.g. with virtual env or miniforge. The recommended python version is 3.9 (that's what I tested). Then, install the requirements with::
 
     pip install -r requirements.txt
 
-If you plan to do local trainings only, you can clone the repo, e.g. via SSH with:
+If you plan to do local trainings only, you can clone the repo, e.g. via SSH with::
 
     git clone git@github.com:ngessert/my_dl_framework.git
 
@@ -55,7 +55,7 @@ Prepare Data and Config
 Download the data (e.g. the `RSNA Challenge Data <>`_) and place it an directory, e.g., named `RSNA_challenge`.
 This directory should contain a folder with the images (e.g. named `training_images`) and the CSV with labels (e.g. named `stage_2_train_labels.csv`).
 
-Optionally, you can create a cross-validation (CV) split file (or you the default one for the RSNA challenge `cv_splits\cv_split_3fold.json`):
+Optionally, you can create a cross-validation (CV) split file (or you the default one for the RSNA challenge `cv_splits\cv_split_3fold.json`)::
 
     python my_dl_framework\\data\\define_cv_split_rsnachallenge.py --num_cv=3 --save_path=C:\\cv_split_3fold.json
 
@@ -75,7 +75,7 @@ If you want to use ClearML for experiment tracking, set up an account at `https:
 Log in and generate App credentials by going to Settings -> Workspaces. Copy the generated credentials into the `clearml.conf` file in the repo root.
 Then, copy the clearml.conf file to your machines home directory.
 
-You can run the training locally with:
+You can run the training locally with::
 
     python my_dl_framework\\training\\train_pl.py --config=C:\\sources\\my_dl_framework\\configs\\test_config.yaml -cl clearml
 
