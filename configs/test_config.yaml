@@ -1,6 +1,7 @@
 dataset_type: "RSNAChallengeBinary"
 base_path: "C:\\data\\RSNA_challenge"
 class_names: ["Class0", "Class1"]
+clearml_tags: ["DenseNet", "Debugging"]
 # CV splitting
 data_split_file: "C:\\sources\\my_dl_framework\\cv_splits\\cv_split_3fold.json"
 run_cv_subset: [0, 1, 2]  # Specify a subset of CV splits to train

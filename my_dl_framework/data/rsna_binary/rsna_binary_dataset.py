@@ -14,20 +14,24 @@ class RSNAChallengeBinaryDataset(Dataset):
     """
     Dataset for RSNA challenge classification task
     """
-    def __init__(self, config: Dict, image_dir: str, subset: Union[List[str], None], is_training: bool, allow_missing_target: bool = False):
+    def __init__(self, config: Dict, image_dir: str, path_to_label_csv: Union[str, None], subset: Union[List[str], None], is_training: bool,
+                 allow_missing_target: bool = False):
         self.config = config
         self.is_training = is_training
         self.subset = subset
         self.allow_missing_target = allow_missing_target
         # Load labels
-        self.labels = pd.read_csv(os.path.join(os.path.normpath(self.config['base_path']), self.config['csv_name']))
+        if path_to_label_csv is not None:
+            self.labels = pd.read_csv(path_to_label_csv)
+        else:
+            self.labels = None
         # Get images
         if self.subset is not None:
-            self.image_paths = [file_name for file_name in glob(os.path.join(os.path.normpath(self.config['base_path']), image_dir, "*"))
+            self.image_paths = [file_name for file_name in glob(os.path.join(image_dir, "*"))
                                 if os.path.isfile(file_name) and
                                 os.path.normpath(file_name).split(os.path.sep)[-1].split(".")[0] in self.subset]
         else:
-            self.image_paths = [file_name for file_name in glob(os.path.join(os.path.normpath(self.config['base_path']), image_dir, "*"))
+            self.image_paths = [file_name for file_name in glob(os.path.join(image_dir, "*"))
                                 if os.path.isfile(file_name)]
         print("Len img paths", len(self.image_paths))
         self.images = list()
@@ -76,7 +80,9 @@ class RSNAChallengeBinaryDataset(Dataset):
             image = load_any_image(self.image_paths[idx])
         # Label from csv
         base_file_name = os.path.normpath(self.image_paths[idx]).split(os.path.sep)[-1].split(".")[0]
-        if (self.labels['patientId'].eq(base_file_name)).any():
+        if self.labels is None:
+            label = 0
+        elif (self.labels['patientId'].eq(base_file_name)).any():
             label = int(self.labels.loc[self.labels['patientId'] == base_file_name].iloc[0]['Target'])
         elif self.allow_missing_target:
             label = 0

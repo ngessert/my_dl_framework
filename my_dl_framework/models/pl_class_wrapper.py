@@ -2,6 +2,7 @@ from typing import Dict, Any, List
 import numpy as np
 import pandas as pd
 import torch
+from pytorch_lightning.loggers.logger import Logger
 from torch.nn import functional as F
 import pytorch_lightning as pl
 
@@ -37,12 +38,19 @@ class PLClassificationWrapper(pl.LightningModule):
     """ Pytorch lightning wrapper for classification models
     """
     def __init__(self, config: Dict, 
-                 training_set_len: int = 0):
+                 training_set_len: int = 0,
+                 is_trainval: bool = False,
+                 prefix: str = ""):
         super().__init__()
         self.config = config
         self.model = get_tv_class_model(config=self.config)
         self.loss_function = get_lossfunction(config=self.config)
         self.training_set_len = training_set_len
+        self.is_trainval = is_trainval
+        # Externally access currently val predictions
+        self.predictions = None
+        self.targets = None
+        self.prefix = prefix
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         res = self.model(x)
@@ -68,7 +76,7 @@ class PLClassificationWrapper(pl.LightningModule):
             batch_idx = step_output["batch_idx"]
             loss = step_output["loss"]
         # Track loss
-        self.log("train_loss", loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
+        self.log("train_loss" + self.prefix, loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
         return {"loss": loss, "batch_idx": batch_idx}
 
     def validation_step(self, val_batch, batch_idx, dataloader_idx=0):
@@ -90,9 +98,35 @@ class PLClassificationWrapper(pl.LightningModule):
                 "indices": stacked_dict["indices"],
                 "dataloader_idx": step_output["dataloader_idx"]}
 
+    def calc_and_log_metrics(self,
+                             loggers: List[Logger],
+                             predictions: np.ndarray,
+                             targets: np.ndarray,
+                             eval_name: str,
+                             prefix: str,
+                             step: int):
+        metrics, plots = calculate_metrics(predictions=predictions,
+                                           targets=targets,
+                                           class_names=self.config["class_names"])
+        for logger in loggers:
+            for i in range(len(self.config["class_names"])):
+                logger.log_metrics(
+                    {key + "_" + self.config["class_names"][i] + "_" + eval_name + prefix: val[i] for key, val in metrics.items()})
+            logger.log_metrics({key + "_mean_" + eval_name + prefix: val[-1] for key, val in metrics.items()})
+            if isinstance(logger, PLClearML):
+                logger.log_plotly(title=eval_name + prefix,
+                                  plotly_obj_dict=plots,
+                                  step=step)
+                metric_df = pd.DataFrame.from_dict(metrics)
+                metric_df["classes"] = self.config["class_names"] + ["Avg"]
+                metric_df.set_index("classes", inplace=True)
+                logger.log_table(title="Metrics " + eval_name + prefix,
+                                 step=step,
+                                 dataframe=metric_df)
+
     def validation_epoch_end(self, outputs):
         # Assumes val loader is put first
-        eval_name = "validation" if outputs[0]["dataloader_idx"] == 0 else "train_val"
+        eval_name = "validation" if outputs[0]["dataloader_idx"] == 0 or self.is_trainval else "train_val"
         stacked_dict = stack_list_of_dicts(outputs, ["outputs", "targets", "indices"], to_numpy=True)
         stacked_preds = stacked_dict["outputs"]
         stacked_targets = stacked_dict["targets"]
@@ -108,19 +142,12 @@ class PLClassificationWrapper(pl.LightningModule):
                 targets.append(stacked_targets[stacked_indices == idx][0])
         predictions = np.array(predictions)
         targets = np.array(targets)
-        metrics, plots = calculate_metrics(predictions=predictions,
-                                           targets=targets,
-                                           class_names=self.config["class_names"])
-        for i in range(len(self.config["class_names"])):
-            self.log_dict({key + "_" + self.config["class_names"][i]: val[i] for key, val in metrics.items()})
-        self.log_dict({key + "_mean": val[-1] for key, val in metrics.items()})
-        for logger in self.loggers:
-            if isinstance(logger, PLClearML):
-                logger.log_plotly(plotly_obj_dict=plots,
+        # Store for usage later
+        self.predictions = predictions
+        self.targets = targets
+        self.calc_and_log_metrics(loggers=self.loggers,
+                                  predictions=predictions,
+                                  targets=targets,
+                                  eval_name=eval_name,
+                                  prefix=self.prefix,
                                   step=self.current_epoch)
-                metric_df = pd.DataFrame.from_dict(metrics)
-                metric_df["classes"] = self.config["class_names"] + ["Avg"]
-                metric_df.set_index("classes", inplace=True)
-                logger.log_table(title="Metrics " + eval_name,
-                                 step=self.current_epoch,
-                                 dataframe=metric_df)

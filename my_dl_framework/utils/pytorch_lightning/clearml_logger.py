@@ -35,11 +35,13 @@ class PLClearML(Logger):
             task: Task,
             name_base: str,
             save_dir: _PATH = ".",
+            title_prefix: str = "",
             log_model: bool = True
     ) -> None:
         super().__init__()
         self.task = task
         self.name_base = name_base
+        self.title_prefix = title_prefix
         self.logger = task.get_logger()
         self._save_dir = save_dir
         self._log_model = log_model
@@ -73,7 +75,7 @@ class PLClearML(Logger):
         if step is None:
             step = 0
         for metric in metrics:
-            self.logger.report_scalar(title=metric,
+            self.logger.report_scalar(title=metric.split(self.title_prefix)[0],
                                       series=metric,
                                       value=metrics[metric],
                                       iteration=step)
@@ -97,6 +99,7 @@ class PLClearML(Logger):
     @rank_zero_only
     def log_plotly(
             self,
+            title: str,
             plotly_obj_dict: Dict[str, Any],
             step: Optional[int] = None,
     ) -> None:
@@ -105,8 +108,8 @@ class PLClearML(Logger):
         if step is None:
             step = 0
         for plot_name, plot in plotly_obj_dict.items():
-            self.logger.report_plotly(title=plot_name,
-                                      series=plot_name,
+            self.logger.report_plotly(title=plot_name + "_" + title,
+                                      series=plot_name + "_" + title,
                                       figure=plot,
                                       iteration=step)
 
@@ -126,7 +129,7 @@ class PLClearML(Logger):
         """
         if step is None:
             step = 0
-        self.logger.report_image(title=title,
+        self.logger.report_image(title=title.split(self.title_prefix)[0],
                                  series=title,
                                  image=image,
                                  iteration=step)
