@@ -18,8 +18,10 @@ import torch
 import pandas as pd
 from glob import glob
 from torch.utils.data import DataLoader
+from typing import Optional
 
 from my_dl_framework.data.get_dataset import get_dataset
+from my_dl_framework.data.utils import collate_aug_batch
 from my_dl_framework.evaluation.utils import calculate_metrics
 from my_dl_framework.models.pl_class_wrapper import PLClassificationWrapper
 import pytorch_lightning as pl
@@ -30,7 +32,7 @@ from my_dl_framework.utils.pytorch_lightning.clearml_logger import PLClearML
 
 
 def run_prediction(folder: str,
-                   clearml_id: str,
+                   clearml_id: Optional[str],
                    clearml: bool,
                    remote: bool,
                    eval_on_train: bool,
@@ -38,9 +40,18 @@ def run_prediction(folder: str,
                    image_path: str,
                    limit_batches: int,
                    dont_log_splits: bool,
-                   label_csv_path: str):
+                   label_csv_path: str,
+                   tta_flip_horz: bool,
+                   tta_flip_vert: bool):
     # Constants
     CV_PREFIX = "_CV_"
+
+    # TTA options
+    tta_options = dict()
+    if tta_flip_horz:
+        tta_options["flip_horz"] = True
+    if tta_flip_vert:
+        tta_options["flip_vert"] = True
 
     image_path = os.path.normpath(image_path)
     if clearml_id is not None:
@@ -116,6 +127,10 @@ def run_prediction(folder: str,
             tags.append(f"Lim{limit_batches}")
         if dont_log_splits:
             tags.append("NoSplits")
+        if tta_flip_horz:
+            tags.append("TTAFlipH")
+        if tta_flip_vert:
+            tags.append("TTAFlipV")
         task.add_tags(tags)
     # for storing predictions, there may be many evaluations
     curr_pred_folder = os.path.join(folder, "pred_and_eval_" + datetime.now().strftime("%d-%m-%Y-%H-%M-%S"))
@@ -152,27 +167,31 @@ def run_prediction(folder: str,
                                   image_dir=image_path,
                                   path_to_label_csv=path_to_label_csv,
                                   subset=subset_val,
+                                  tta_options=tta_options,
                                   is_training=False)
         print(f'Size validation dataset {len(dataset_val)}')
 
         dataloader_val = DataLoader(dataset=dataset_val, batch_size=config["batch_size"], shuffle=False,
-                                    num_workers=8, pin_memory=True)
+                                    num_workers=8, pin_memory=True, collate_fn=collate_aug_batch if tta_options else None)
         if eval_on_train and cv_eval:
             dataset_train_val = get_dataset(config=config,
                                             image_dir=image_path,
                                             path_to_label_csv=path_to_label_csv,
                                             subset=subset_train,
+                                            tta_options=tta_options,
                                             is_training=False)
             print(f'Size validation dataset {len(dataset_train_val)}')
             dataloader_train_val = DataLoader(dataset=dataset_train_val, batch_size=config["batch_size"], shuffle=False,
-                                              num_workers=8, pin_memory=True)
+                                              num_workers=8, pin_memory=True, collate_fn=collate_aug_batch if tta_options else None)
         else:
             dataloader_train_val = None
         model = PLClassificationWrapper(config=config,
                                         training_set_len=len(dataset_val),
                                         prefix=CV_PREFIX + str(cv_idx+1))
+        # grab from model and save
+        curr_subfolder_cv_pred = os.path.join(curr_pred_folder, "CV_" + str(cv_idx + 1))
         # we also want local logs
-        csv_logger = pl.loggers.CSVLogger(curr_subfolder_cv, name="eval_local_logs")
+        csv_logger = pl.loggers.CSVLogger(curr_subfolder_cv_pred, name="eval_local_logs")
         if task is not None:
             pl_clearml_logger = PLClearML(task=task, name_base="CV" + str(cv_idx+1), title_prefix=CV_PREFIX)
         else:
@@ -197,8 +216,6 @@ def run_prediction(folder: str,
         # Load checkpoint if training is continued and ckpt exists
         ckpt_path = os.path.join(curr_subfolder_cv, "last.ckpt")
         trainer.validate(model, dataloader_val, ckpt_path=ckpt_path)
-        # grab from model and save
-        curr_subfolder_cv_pred = os.path.join(curr_pred_folder, "CV_" + str(cv_idx + 1))
         if not dont_log_splits:
             os.makedirs(curr_subfolder_cv_pred, exist_ok=True)
             np.save(os.path.join(curr_subfolder_cv_pred, "predictions.npy"), model.predictions)
@@ -278,6 +295,9 @@ if __name__ == "__main__":
     argparser.add_argument('-t', '--image_path', type=str, default=None, help='Test image path for prediction', required=False)
     argparser.add_argument('-lcp', '--label_csv_path', type=str, default=None, help='Optional path to a label CSV that overrides the default one (CV eval) or is used for predict mode', required=False)
     argparser.add_argument('-l', '--limit_batches', type=int, default=None, help='Test with a subset of batches', required=False)
+
+    argparser.add_argument('-ttafh', '--tta_flip_horz', action="store_true", help='Test-time augmentation: horizontal flip', required=False)
+    argparser.add_argument('-ttafv', '--tta_flip_vert', action="store_true", help='Test-time augmentation: vertical flip', required=False)
     args = argparser.parse_args()
     print(f'Args: {args}')
     run_prediction(folder=args.folder,
@@ -289,4 +309,6 @@ if __name__ == "__main__":
                    image_path=args.image_path,
                    limit_batches=args.limit_batches,
                    dont_log_splits=args.dont_log_splits,
-                   label_csv_path=args.label_csv_path)
+                   label_csv_path=args.label_csv_path,
+                   tta_flip_horz=args.tta_flip_horz,
+                   tta_flip_vert=args.tta_flip_vert)

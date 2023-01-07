@@ -32,6 +32,29 @@ class ZeroOneNorm:
         return image
 
 
+class AddBatchDim:
+    """
+    Add batch dim
+    """
+    def __init__(self):
+        pass
+
+    def __call__(self, image: torch.Tensor) -> torch.Tensor:
+        return image.unsqueeze(0)
+
+
+class FlipTTA:
+    """
+    Flip TTA augmentation. Expects a batch dim to be present
+    """
+    def __init__(self, flip_axis: int):
+        self.flip_axis = flip_axis
+
+    def __call__(self, image: torch.Tensor) -> torch.Tensor:
+        result = torch.cat((image, torch.flip(image, dims=[self.flip_axis])))
+        return result
+
+
 def collate_aug_batch(batch):
     """ Collates an augmented batch, i.e., when the dataset returns
         returns multiple images at once.
@@ -40,4 +63,4 @@ def collate_aug_batch(batch):
     :return: collated batch
     """
     indices, imgs, targets = zip(*batch)
-    return torch.cat(indices), torch.cat(imgs),torch.cat(targets)
+    return torch.cat(indices), torch.cat(imgs), torch.cat(targets)

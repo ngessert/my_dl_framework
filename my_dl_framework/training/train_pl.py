@@ -37,6 +37,8 @@ def run_training(config_path: str,
     :param fast_dev_run:        Pytorch lighning dev-run option
     :return:
     """
+    # Constants
+    CV_PREFIX = "_CV_"
     # Import config
     with open(config_path, encoding="utf-8") as file:
         config = yaml.safe_load(file)
@@ -75,7 +77,7 @@ def run_training(config_path: str,
     shutil.copy(os.path.normpath(config["data_split_file"]), os.path.join(curr_subfolder, "cv_split_file.json"))
     if clearml:
         # Write to disk for easier access
-        with open(os.path.join(curr_subfolder, "clearml_id.txt"), encoding="utf-8") as file:
+        with open(os.path.join(curr_subfolder, "clearml_id.txt"), "w", encoding="utf-8") as file:
             file.write(f"{task.task_id}")
     if task is not None:
         task.upload_artifact("cv_split_file", os.path.normpath(config["data_split_file"]))
@@ -124,9 +126,9 @@ def run_training(config_path: str,
             dataloader_train_val = None
         model = PLClassificationWrapper(config=config,
                                         training_set_len=len(dataset_train),
-                                        prefix="CV_" + str(cv_idx+1))
+                                        prefix=CV_PREFIX + str(cv_idx+1))
         checkpoint_callback = pl.callbacks.ModelCheckpoint(
-            monitor=config["val_best_metric"] + "CV_" + str(cv_idx+1),
+            monitor=config["val_best_metric"] + CV_PREFIX + str(cv_idx+1),
             save_last=True,
             save_top_k=1,
             dirpath=curr_subfolder_cv,
@@ -138,7 +140,7 @@ def run_training(config_path: str,
         # we also want local logs
         csv_logger = pl.loggers.CSVLogger(curr_subfolder_cv, name="local_logs")
         if task is not None:
-            pl_clearml_logger = PLClearML(task=task, name_base="CV" + str(cv_idx+1))
+            pl_clearml_logger = PLClearML(task=task, name_base="CV" + str(cv_idx+1), title_prefix=CV_PREFIX)
         else:
             pl_clearml_logger = None
         pl.seed_everything(42, workers=True)

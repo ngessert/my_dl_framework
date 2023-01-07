@@ -37,5 +37,5 @@ validate_every_x_epochs: 1
 validate_on_train_set: False
 test_aug_ensemble_mode: mean
 max_num_batches_val: 1
-val_best_metric: auc_score_mean
+val_best_metric: auc_score_mean_validation
 val_best_target: max

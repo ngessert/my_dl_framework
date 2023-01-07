@@ -24,9 +24,14 @@ def get_tv_class_model(config: Dict) -> torch.nn.Module:
     model = get_model(config["classification_model_name"], weights="DEFAULT")
     if hasattr(model, "classifier"):
         if isinstance(model.classifier, torch.nn.Sequential):
-            # Efficientnet
-            in_features = model.classifier[1].in_features
-            model.classifier[1] = torch.nn.Linear(in_features, config['num_classes'])
+            # Squeezenet
+            if len(model.classifier) == 4:
+                final_conv = torch.nn.Conv2d(model.classifier[1].in_channels, config['num_classes'], kernel_size=(1, 1))
+                model.classifier[1] = final_conv
+            else:
+                # Efficientnet
+                in_features = model.classifier[1].in_features
+                model.classifier[1] = torch.nn.Linear(in_features, config['num_classes'])
         else:
             # Densenet
             in_features = model.classifier.in_features

@@ -7,7 +7,7 @@ from torchvision import transforms
 import pandas as pd
 import numpy as np
 
-from my_dl_framework.data.utils import load_any_image, ZeroOneNorm
+from my_dl_framework.data.utils import load_any_image, ZeroOneNorm, AddBatchDim, FlipTTA
 
 
 class RSNAChallengeBinaryDataset(Dataset):
@@ -15,11 +15,12 @@ class RSNAChallengeBinaryDataset(Dataset):
     Dataset for RSNA challenge classification task
     """
     def __init__(self, config: Dict, image_dir: str, path_to_label_csv: Union[str, None], subset: Union[List[str], None], is_training: bool,
-                 allow_missing_target: bool = False):
+                 allow_missing_target: bool = False, tta_options: Dict = None):
         self.config = config
         self.is_training = is_training
         self.subset = subset
         self.allow_missing_target = allow_missing_target
+        self.tta_options = tta_options or dict()
         # Load labels
         if path_to_label_csv is not None:
             self.labels = pd.read_csv(path_to_label_csv)
@@ -59,6 +60,12 @@ class RSNAChallengeBinaryDataset(Dataset):
         else:
             if self.config['apply_center_crop_inf'] is not None:
                 transform_list.append(transforms.CenterCrop(self.config['random_crop']))
+            if self.tta_options:
+                transform_list.append(AddBatchDim())
+            if "flip_horz" in self.tta_options:
+                transform_list.append(FlipTTA(flip_axis=3))
+            if "flip_vert" in self.tta_options:
+                transform_list.append(FlipTTA(flip_axis=2))
         self.all_transforms = transforms.Compose(transform_list)
 
     def __len__(self):
@@ -92,5 +99,10 @@ class RSNAChallengeBinaryDataset(Dataset):
         image = np.concatenate((image[:, :, None], image[:, :, None], image[:, :, None]), axis=2)
         # Data augmentation
         image = self.all_transforms(image)
-        # TODO: take repeat label and idx for testtime aug
+        # repeat label and idx for testtime aug
+        if self.tta_options:
+            # batch dim is number of TTAs performed
+            num_reps = image.shape[0]
+            label = torch.ones([num_reps], dtype=torch.int32) * label
+            idx = torch.ones([num_reps], dtype=torch.int32) * idx
         return idx, image, label

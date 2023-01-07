@@ -1,4 +1,4 @@
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 import numpy as np
 import pandas as pd
 import torch
@@ -99,20 +99,32 @@ class PLClassificationWrapper(pl.LightningModule):
                 "dataloader_idx": step_output["dataloader_idx"]}
 
     def calc_and_log_metrics(self,
-                             loggers: List[Logger],
                              predictions: np.ndarray,
                              targets: np.ndarray,
                              eval_name: str,
                              prefix: str,
-                             step: int):
+                             step: int,
+                             loggers: Optional[List[Logger]] = None,
+                             ):
         metrics, plots = calculate_metrics(predictions=predictions,
                                            targets=targets,
                                            class_names=self.config["class_names"])
+        for i in range(len(self.config["class_names"])):
+            log_dict = {key + "_" + self.config["class_names"][i] + "_" + eval_name + prefix: val[i] for key, val in metrics.items()}
+            if loggers is None:
+                self.log_dict(log_dict)
+            else:
+                for logger in loggers:
+                    logger.log_metrics(log_dict)
+        log_dict = {key + "_mean_" + eval_name + prefix: val[-1] for key, val in metrics.items()}
+        if loggers is None:
+            self.log_dict(log_dict)
+        else:
+            for logger in loggers:
+                logger.log_metrics(log_dict)
+        if loggers is None:
+            loggers = self.loggers
         for logger in loggers:
-            for i in range(len(self.config["class_names"])):
-                logger.log_metrics(
-                    {key + "_" + self.config["class_names"][i] + "_" + eval_name + prefix: val[i] for key, val in metrics.items()})
-            logger.log_metrics({key + "_mean_" + eval_name + prefix: val[-1] for key, val in metrics.items()})
             if isinstance(logger, PLClearML):
                 logger.log_plotly(title=eval_name + prefix,
                                   plotly_obj_dict=plots,
@@ -145,7 +157,7 @@ class PLClassificationWrapper(pl.LightningModule):
         # Store for usage later
         self.predictions = predictions
         self.targets = targets
-        self.calc_and_log_metrics(loggers=self.loggers,
+        self.calc_and_log_metrics(loggers=None, # Use self.log .. so it's properly registered
                                   predictions=predictions,
                                   targets=targets,
                                   eval_name=eval_name,
