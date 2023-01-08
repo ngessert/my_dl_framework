@@ -17,7 +17,10 @@ def test_eval_and_pred_script():
                    image_path=os.path.join("tests", "test_data", "rsna_binary", "images"),
                    limit_batches=1,
                    dont_log_splits=False,
-                   label_csv_path=os.path.join("tests", "test_data", "rsna_binary", "stage_2_train_labels_test.csv")
+                   label_csv_path=os.path.join("tests", "test_data", "rsna_binary", "stage_2_train_labels_test.csv"),
+                   tta_flip_horz=True,
+                   tta_flip_vert=False,
+                   tta_multi_eq_crop=2,
                    )
     found_experiment = False
     for folder in glob(os.path.join("tests", "test_data", "rsna_binary", "exp_for_val", "*")):

@@ -1,14 +1,14 @@
 """
 General dataset getter
 """
-from typing import Dict, List, Union
+from typing import Dict, List, Union, Optional
 from torch.utils.data import Dataset
 
 from my_dl_framework.data.rsna_binary.rsna_binary_dataset import RSNAChallengeBinaryDataset
 
 
 def get_dataset(config: Dict, image_dir: str, path_to_label_csv: Union[str, None], subset: Union[List[str], None],
-                tta_options: Dict, is_training: bool) -> Dataset:
+                tta_options: Optional[Dict], is_training: bool) -> Dataset:
     """
     Getter for a torch dataset
     :param config:          Dict with config

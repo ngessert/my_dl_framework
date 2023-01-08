@@ -94,7 +94,8 @@ def run_training(config_path: str,
                                     image_dir=os.path.join(os.path.normpath(config['base_path']), config["training_image_dir"]),
                                     path_to_label_csv=os.path.join(os.path.normpath(config['base_path']), config['csv_name']),
                                     subset=subset_train,
-                                    is_training=True)
+                                    is_training=True,
+                                    tta_options=None)
         print(f'Size training dataset {len(dataset_train)}')
 
         dataloader_train = DataLoader(dataset=dataset_train, batch_size=config["batch_size"], shuffle=True,
@@ -106,7 +107,8 @@ def run_training(config_path: str,
                                   path_to_label_csv=os.path.join(os.path.normpath(config['base_path']),
                                                                  config['csv_name']),
                                   subset=subset_val,
-                                  is_training=False)
+                                  is_training=False,
+                                  tta_options=None)
         print(f'Size validation dataset {len(dataset_val)}')
 
         dataloader_val = DataLoader(dataset=dataset_val, batch_size=config["batch_size"], shuffle=False,
@@ -118,7 +120,8 @@ def run_training(config_path: str,
                                             path_to_label_csv=os.path.join(os.path.normpath(config['base_path']),
                                                                            config['csv_name']),
                                             subset=subset_train,
-                                            is_training=False)
+                                            is_training=False,
+                                            tta_options=None)
             print(f'Size validation dataset {len(dataset_train_val)}')
             dataloader_train_val = DataLoader(dataset=dataset_train_val, batch_size=config["batch_size"], shuffle=False,
                                               num_workers=8, pin_memory=True)

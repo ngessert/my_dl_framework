@@ -30,17 +30,22 @@ Planned features:
 
     *   Supported tasks
 
-        * Image segmentation.
-        * Image bounding box detection.
+        * Image segmentation
+        * Image bounding box detection
     *   Supported datasets
 
-        * ISIC Skin Lesion Classification Challenge.
+        * ISIC Skin Lesion Classification Challenge
+
+    *   More documentation
+    *   More unit tests/regression tests
 
 
-:Documentation:
+Documentation:
+
     `Documentation <https://deep-echo.philips-internal.com/>`_
 
-:Repo:
+Repo:
+
     `https://github.com/ngessert/my_dl_framework <https://github.com/ngessert/my_dl_framework>`_
 
 Getting Started
@@ -124,7 +129,7 @@ For more options, such as limiting batches, skipping intermediate metrics, and t
 Ensembling
 =============================
 
-After evaluation, you can ensemble multiple models together:
+After evaluation, you can ensemble multiple models together: TODO
 
 
 .. |Tests Status| image:: https://github.com/ngessert/my_dl_framework/actions/workflows/main.yml/badge.svg?branch=develop

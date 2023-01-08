@@ -26,7 +26,8 @@ preload_images: False
 resize_images: 256
 random_crop: 224
 random_fliplr: True
-color_jitter: True
+random_flipud: False
+color_jitter: [0.5, 0.5, 0.2, 0.2]  # brightness, contrast, saturation, hue
 continue_training: null  # null or the timestamp
 continue_training_from_clearml: null # null or clearml ID
 ckpt_every_n_epochs: 1

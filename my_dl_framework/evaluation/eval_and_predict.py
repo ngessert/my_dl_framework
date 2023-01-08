@@ -29,6 +29,7 @@ from clearml import Task, TaskTypes
 
 from my_dl_framework.utils.parse_str import parse_str
 from my_dl_framework.utils.pytorch_lightning.clearml_logger import PLClearML
+from my_dl_framework.utils.pytorch_lightning.minibatch_plot_callback import MBPlotCallback
 
 
 def run_prediction(folder: str,
@@ -42,16 +43,23 @@ def run_prediction(folder: str,
                    dont_log_splits: bool,
                    label_csv_path: str,
                    tta_flip_horz: bool,
-                   tta_flip_vert: bool):
+                   tta_flip_vert: bool,
+                   tta_multi_eq_crop: int):
     # Constants
     CV_PREFIX = "_CV_"
 
     # TTA options
+    batch_size_factor = 1
     tta_options = dict()
     if tta_flip_horz:
         tta_options["flip_horz"] = True
+        batch_size_factor *= 2
     if tta_flip_vert:
         tta_options["flip_vert"] = True
+        batch_size_factor *= 2
+    if tta_multi_eq_crop > 0:
+        tta_options["multi_eq_crop"] = tta_multi_eq_crop
+        batch_size_factor *= tta_multi_eq_crop
 
     image_path = os.path.normpath(image_path)
     if clearml_id is not None:
@@ -131,6 +139,8 @@ def run_prediction(folder: str,
             tags.append("TTAFlipH")
         if tta_flip_vert:
             tags.append("TTAFlipV")
+        if tta_multi_eq_crop:
+            tags.append(f"TTAMEQ{tta_multi_eq_crop}")
         task.add_tags(tags)
     # for storing predictions, there may be many evaluations
     curr_pred_folder = os.path.join(folder, "pred_and_eval_" + datetime.now().strftime("%d-%m-%Y-%H-%M-%S"))
@@ -170,8 +180,10 @@ def run_prediction(folder: str,
                                   tta_options=tta_options,
                                   is_training=False)
         print(f'Size validation dataset {len(dataset_val)}')
-
-        dataloader_val = DataLoader(dataset=dataset_val, batch_size=config["batch_size"], shuffle=False,
+        batcH_size_adj = config["batch_size"] // batch_size_factor
+        if batcH_size_adj <= 0:
+            batcH_size_adj = 1
+        dataloader_val = DataLoader(dataset=dataset_val, batch_size=batcH_size_adj, shuffle=False,
                                     num_workers=8, pin_memory=True, collate_fn=collate_aug_batch if tta_options else None)
         if eval_on_train and cv_eval:
             dataset_train_val = get_dataset(config=config,
@@ -181,7 +193,7 @@ def run_prediction(folder: str,
                                             tta_options=tta_options,
                                             is_training=False)
             print(f'Size validation dataset {len(dataset_train_val)}')
-            dataloader_train_val = DataLoader(dataset=dataset_train_val, batch_size=config["batch_size"], shuffle=False,
+            dataloader_train_val = DataLoader(dataset=dataset_train_val, batch_size=batcH_size_adj, shuffle=False,
                                               num_workers=8, pin_memory=True, collate_fn=collate_aug_batch if tta_options else None)
         else:
             dataloader_train_val = None
@@ -208,6 +220,7 @@ def run_prediction(folder: str,
                              default_root_dir=curr_subfolder_cv,
                              accelerator="auto",
                              max_epochs=config["num_epochs"],
+                             callbacks=[MBPlotCallback(curr_subfolder_cv_pred, config)],
                              auto_select_gpus=True,
                              deterministic=True,
                              logger=curr_loggers,
@@ -298,6 +311,7 @@ if __name__ == "__main__":
 
     argparser.add_argument('-ttafh', '--tta_flip_horz', action="store_true", help='Test-time augmentation: horizontal flip', required=False)
     argparser.add_argument('-ttafv', '--tta_flip_vert', action="store_true", help='Test-time augmentation: vertical flip', required=False)
+    argparser.add_argument('-ttameq', '--tta_multi_eq_crop', type=int, default=0, help='Test-time augmentation: multiple equal crops', required=False)
     args = argparser.parse_args()
     print(f'Args: {args}')
     run_prediction(folder=args.folder,
@@ -311,4 +325,5 @@ if __name__ == "__main__":
                    dont_log_splits=args.dont_log_splits,
                    label_csv_path=args.label_csv_path,
                    tta_flip_horz=args.tta_flip_horz,
-                   tta_flip_vert=args.tta_flip_vert)
+                   tta_flip_vert=args.tta_flip_vert,
+                   tta_multi_eq_crop=args.tta_multi_eq_crop)

@@ -7,7 +7,7 @@ from torchvision import transforms
 import pandas as pd
 import numpy as np
 
-from my_dl_framework.data.utils import load_any_image, ZeroOneNorm, AddBatchDim, FlipTTA
+from my_dl_framework.data.utils import load_any_image, ZeroOneNorm, AddBatchDim, FlipTTA, MultiEqualCrop
 
 
 class RSNAChallengeBinaryDataset(Dataset):
@@ -48,20 +48,24 @@ class RSNAChallengeBinaryDataset(Dataset):
         if self.is_training:
             if self.config['random_crop'] is not None:
                 transform_list.append(transforms.RandomCrop(self.config['random_crop']))
-            if self.config['random_fliplr'] is not None:
+            if self.config['random_fliplr']:
                 transform_list.append(transforms.RandomHorizontalFlip())
+            if self.config['random_flipud']:
+                transform_list.append(transforms.RandomVerticalFlip())
             if self.config['color_jitter'] is not None:
                 transform_list.append(transforms.ColorJitter(
-                    brightness=0.5,
-                    contrast=0.5,
-                    saturation=0.2,
-                    hue=0.2
+                    brightness=self.config['color_jitter'][0],
+                    contrast=self.config['color_jitter'][1],
+                    saturation=self.config['color_jitter'][2],
+                    hue=self.config['color_jitter'][3]
                 ))
         else:
-            if self.config['apply_center_crop_inf'] is not None:
+            if self.config['apply_center_crop_inf'] is not None and "multi_eq_crop" not in self.tta_options:
                 transform_list.append(transforms.CenterCrop(self.config['random_crop']))
             if self.tta_options:
                 transform_list.append(AddBatchDim())
+            if "multi_eq_crop" in self.tta_options:
+                transform_list.append(MultiEqualCrop(num_per_axis=self.tta_options["multi_eq_crop"], crop_size=self.config["random_crop"]))
             if "flip_horz" in self.tta_options:
                 transform_list.append(FlipTTA(flip_axis=3))
             if "flip_vert" in self.tta_options:
