@@ -16,7 +16,7 @@ import pytorch_lightning as pl
 from typing import Union
 
 from my_dl_framework.data.get_dataset import get_dataset
-from my_dl_framework.models.pl_wrapper import PLClassificationWrapper
+from my_dl_framework.models.pl_class_wrapper import PLClassificationWrapper
 from my_dl_framework.utils.pytorch_lightning.clearml_logger import PLClearML
 from my_dl_framework.utils.pytorch_lightning.minibatch_plot_callback import MBPlotCallback
 
@@ -37,6 +37,8 @@ def run_training(config_path: str,
     :param fast_dev_run:        Pytorch lighning dev-run option
     :return:
     """
+    # Constants
+    CV_PREFIX = "_CV_"
     # Import config
     with open(config_path, encoding="utf-8") as file:
         config = yaml.safe_load(file)
@@ -57,6 +59,7 @@ def run_training(config_path: str,
                 task_prev = Task.get_task(task_id=config["continue_training_from_clearml"])
                 print(f'Use ckpts from task {config["continue_training_from_clearml"]}')
         task.connect(config)
+        task.add_tags(config["clearml_tags"])
     # Run Training
     # Setup CV
     with open(os.path.normpath(config["data_split_file"]), encoding="utf-8") as file:
@@ -68,6 +71,16 @@ def run_training(config_path: str,
         curr_subfolder += config["continue_training"]
     else:
         curr_subfolder += datetime.now().strftime("%d-%m-%Y-%H-%M-%S")
+    # Copy CV file to folder and clearml for later use in evaluation
+    os.makedirs(curr_subfolder, exist_ok=True)
+    shutil.copy(os.path.normpath(config_path), os.path.join(curr_subfolder, "config.yaml"))
+    shutil.copy(os.path.normpath(config["data_split_file"]), os.path.join(curr_subfolder, "cv_split_file.json"))
+    if clearml:
+        # Write to disk for easier access
+        with open(os.path.join(curr_subfolder, "clearml_id.txt"), "w", encoding="utf-8") as file:
+            file.write(f"{task.task_id}")
+    if task is not None:
+        task.upload_artifact("cv_split_file", os.path.normpath(config["data_split_file"]))
     for cv_idx, (subset_train, subset_val) in enumerate(zip(training_subsets, validation_subsets)):
         if config["run_cv_subset"] is not None:
             # Skip CV folds that are not selected
@@ -77,31 +90,48 @@ def run_training(config_path: str,
         curr_subfolder_cv = os.path.join(curr_subfolder, "CV_" + str(cv_idx+1))
         os.makedirs(curr_subfolder_cv, exist_ok=True)
         # Data
-        dataset_train = get_dataset(config=config, image_dir=config["training_image_dir"], subset=subset_train,
-                                    is_training=True)
+        dataset_train = get_dataset(config=config,
+                                    image_dir=os.path.join(os.path.normpath(config['base_path']), config["training_image_dir"]),
+                                    path_to_label_csv=os.path.join(os.path.normpath(config['base_path']), config['csv_name']),
+                                    subset=subset_train,
+                                    is_training=True,
+                                    tta_options=None)
         print(f'Size training dataset {len(dataset_train)}')
 
         dataloader_train = DataLoader(dataset=dataset_train, batch_size=config["batch_size"], shuffle=True,
                                       num_workers=8, pin_memory=True,
                                       worker_init_fn=None)
-        dataset_val = get_dataset(config=config, image_dir=config["training_image_dir"], subset=subset_val,
-                                  is_training=False)
+        dataset_val = get_dataset(config=config,
+                                  image_dir=os.path.join(os.path.normpath(config['base_path']),
+                                                         config["training_image_dir"]),
+                                  path_to_label_csv=os.path.join(os.path.normpath(config['base_path']),
+                                                                 config['csv_name']),
+                                  subset=subset_val,
+                                  is_training=False,
+                                  tta_options=None)
         print(f'Size validation dataset {len(dataset_val)}')
 
         dataloader_val = DataLoader(dataset=dataset_val, batch_size=config["batch_size"], shuffle=False,
                                     num_workers=8, pin_memory=True)
         if config['validate_on_train_set']:
-            dataset_train_val = get_dataset(config=config, image_dir=config["training_image_dir"], subset=subset_train,
-                                            is_training=False)
+            dataset_train_val = get_dataset(config=config,
+                                            image_dir=os.path.join(os.path.normpath(config['base_path']),
+                                                                   config["training_image_dir"]),
+                                            path_to_label_csv=os.path.join(os.path.normpath(config['base_path']),
+                                                                           config['csv_name']),
+                                            subset=subset_train,
+                                            is_training=False,
+                                            tta_options=None)
             print(f'Size validation dataset {len(dataset_train_val)}')
             dataloader_train_val = DataLoader(dataset=dataset_train_val, batch_size=config["batch_size"], shuffle=False,
                                               num_workers=8, pin_memory=True)
         else:
             dataloader_train_val = None
         model = PLClassificationWrapper(config=config,
-                                        training_set_len=len(dataset_train))
+                                        training_set_len=len(dataset_train),
+                                        prefix=CV_PREFIX + str(cv_idx+1))
         checkpoint_callback = pl.callbacks.ModelCheckpoint(
-            monitor=config["val_best_metric"],
+            monitor=config["val_best_metric"] + CV_PREFIX + str(cv_idx+1),
             save_last=True,
             save_top_k=1,
             dirpath=curr_subfolder_cv,
@@ -113,7 +143,7 @@ def run_training(config_path: str,
         # we also want local logs
         csv_logger = pl.loggers.CSVLogger(curr_subfolder_cv, name="local_logs")
         if task is not None:
-            pl_clearml_logger = PLClearML(task=task, name_base="CV" + str(cv_idx+1))
+            pl_clearml_logger = PLClearML(task=task, name_base="CV" + str(cv_idx+1), title_prefix=CV_PREFIX)
         else:
             pl_clearml_logger = None
         pl.seed_everything(42, workers=True)
@@ -153,10 +183,10 @@ def run_training(config_path: str,
 if __name__ == "__main__":
     argparser = argparse.ArgumentParser()
     argparser.add_argument('-c', '--config', type=str, help='Config path', required=True)
-    argparser.add_argument('-cl', '--clearml', type=bool, default=False, help='Whether to use clearml', required=False)
-    argparser.add_argument('-ng', '--num_gpus', type=int, default=1, help="Number of GPUs to use")
+    argparser.add_argument('-cl', '--clearml', action="store_true", help='Whether to use clearml', required=False)
+    argparser.add_argument('-ng', '--num_gpus', type=int, default=None, help="Number of GPUs to use")
     argparser.add_argument('-st', '--multi_gpu_strat', type=str, default=None, help="MultiGPU strat, e.g. ddp")
-    argparser.add_argument('-r', '--remote', type=bool, default=False, help='Whether remote execution is done remote', required=False)
+    argparser.add_argument('-r', '--remote', action="store_true", help='Whether remote execution is done remote', required=False)
     argparser.add_argument('-fd', '--fast_dev_run', type=int, default=None, help="test only x batches")
     args = argparser.parse_args()
     print(f'Args: {args}')

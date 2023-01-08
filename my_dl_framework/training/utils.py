@@ -22,8 +22,34 @@ def get_tv_class_model(config: Dict) -> torch.nn.Module:
     :return:                Torch model
     """
     model = get_model(config["classification_model_name"], weights="DEFAULT")
-    in_features = model.classifier.in_features
-    model.classifier = torch.nn.Linear(in_features, config['num_classes'])
+    if hasattr(model, "classifier"):
+        if isinstance(model.classifier, torch.nn.Sequential):
+            # Squeezenet
+            if len(model.classifier) == 4:
+                final_conv = torch.nn.Conv2d(model.classifier[1].in_channels, config['num_classes'], kernel_size=(1, 1))
+                model.classifier[1] = final_conv
+            else:
+                # Efficientnet
+                in_features = model.classifier[1].in_features
+                model.classifier[1] = torch.nn.Linear(in_features, config['num_classes'])
+        else:
+            # Densenet
+            in_features = model.classifier.in_features
+            model.classifier = torch.nn.Linear(in_features, config['num_classes'])
+    elif hasattr(model, "fc"):
+        # Resnet
+        in_features = model.fc.in_features
+        model.fc = torch.nn.Linear(in_features, config['num_classes'])
+    elif hasattr(model, "heads"):
+        # Vision transformer
+        in_features = model.heads[-1].in_features
+        model.heads[-1] = torch.nn.Linear(in_features, config['num_classes'])
+    elif hasattr(model, "head"):
+        # Swin transformer
+        in_features = model.head.in_features
+        model.head = torch.nn.Linear(in_features, config['num_classes'])
+    else:
+        raise ValueError(f'Output layer replacement not implemented for model {config["classification_model_name"]}')
     return model
 
 
