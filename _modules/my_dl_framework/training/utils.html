@@ -1,0 +1,394 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <title>my_dl_framework.training.utils &mdash; MyDLFramework 0.1 documentation</title>
+  
+
+  
+  <link rel="stylesheet" href="../../../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../../../_static/css/theme.css" type="text/css" />
+
+  
+  
+
+  
+  
+
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../../../" src="../../../_static/documentation_options.js"></script>
+        <script data-url_root="../../../" id="documentation_options" src="../../../_static/documentation_options.js"></script>
+        <script src="../../../_static/doctools.js"></script>
+        <script src="../../../_static/sphinx_highlight.js"></script>
+    
+    <script type="text/javascript" src="../../../_static/js/theme.js"></script>
+
+    
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../../../index.html" class="icon icon-home"> MyDLFramework
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                0.1
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../readme.html">Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../training.html">Training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../evaluation.html">Evaluation and Ensembling</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/modules.html">Module Reference</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">MyDLFramework</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../../../index.html" class="icon icon-home"></a> &raquo;</li>
+        
+          <li><a href="../../index.html">Module code</a> &raquo;</li>
+        
+      <li>my_dl_framework.training.utils</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <h1>Source code for my_dl_framework.training.utils</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Training utility stuff</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">json</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Tuple</span>
+<span class="kn">from</span> <span class="nn">torch.utils.data</span> <span class="kn">import</span> <span class="n">Dataset</span>
+<span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">from</span> <span class="nn">torchvision.models</span> <span class="kn">import</span> <span class="n">get_model</span>
+<span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">plotly</span>
+<span class="kn">from</span> <span class="nn">clearml</span> <span class="kn">import</span> <span class="n">Logger</span>
+<span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
+<span class="kn">from</span> <span class="nn">my_dl_framework.evaluation.utils</span> <span class="kn">import</span> <span class="n">validate_model_classification</span>
+
+
+<div class="viewcode-block" id="get_tv_class_model"><a class="viewcode-back" href="../../../api/my_dl_framework.training.html#my_dl_framework.training.utils.get_tv_class_model">[docs]</a><span class="k">def</span> <span class="nf">get_tv_class_model</span><span class="p">(</span><span class="n">config</span><span class="p">:</span> <span class="n">Dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Get a torchvision classification model and replace output layer</span>
+<span class="sd">    :param config:          Dict with config</span>
+<span class="sd">    :return:                Torch model</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">model</span> <span class="o">=</span> <span class="n">get_model</span><span class="p">(</span><span class="n">config</span><span class="p">[</span><span class="s2">&quot;classification_model_name&quot;</span><span class="p">],</span> <span class="n">weights</span><span class="o">=</span><span class="s2">&quot;DEFAULT&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="s2">&quot;classifier&quot;</span><span class="p">):</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">classifier</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Sequential</span><span class="p">):</span>
+            <span class="c1"># Squeezenet</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">classifier</span><span class="p">)</span> <span class="o">==</span> <span class="mi">4</span><span class="p">:</span>
+                <span class="n">final_conv</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Conv2d</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">classifier</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">in_channels</span><span class="p">,</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;num_classes&#39;</span><span class="p">],</span> <span class="n">kernel_size</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
+                <span class="n">model</span><span class="o">.</span><span class="n">classifier</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">final_conv</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="c1"># Efficientnet</span>
+                <span class="n">in_features</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">classifier</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">in_features</span>
+                <span class="n">model</span><span class="o">.</span><span class="n">classifier</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="n">in_features</span><span class="p">,</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;num_classes&#39;</span><span class="p">])</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># Densenet</span>
+            <span class="n">in_features</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">classifier</span><span class="o">.</span><span class="n">in_features</span>
+            <span class="n">model</span><span class="o">.</span><span class="n">classifier</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="n">in_features</span><span class="p">,</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;num_classes&#39;</span><span class="p">])</span>
+    <span class="k">elif</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="s2">&quot;fc&quot;</span><span class="p">):</span>
+        <span class="c1"># Resnet</span>
+        <span class="n">in_features</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">fc</span><span class="o">.</span><span class="n">in_features</span>
+        <span class="n">model</span><span class="o">.</span><span class="n">fc</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="n">in_features</span><span class="p">,</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;num_classes&#39;</span><span class="p">])</span>
+    <span class="k">elif</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="s2">&quot;heads&quot;</span><span class="p">):</span>
+        <span class="c1"># Vision transformer</span>
+        <span class="n">in_features</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">heads</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">in_features</span>
+        <span class="n">model</span><span class="o">.</span><span class="n">heads</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="n">in_features</span><span class="p">,</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;num_classes&#39;</span><span class="p">])</span>
+    <span class="k">elif</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="s2">&quot;head&quot;</span><span class="p">):</span>
+        <span class="c1"># Swin transformer</span>
+        <span class="n">in_features</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">head</span><span class="o">.</span><span class="n">in_features</span>
+        <span class="n">model</span><span class="o">.</span><span class="n">head</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="n">in_features</span><span class="p">,</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;num_classes&#39;</span><span class="p">])</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Output layer replacement not implemented for model </span><span class="si">{</span><span class="n">config</span><span class="p">[</span><span class="s2">&quot;classification_model_name&quot;</span><span class="p">]</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">model</span></div>
+
+
+<div class="viewcode-block" id="get_lossfunction"><a class="viewcode-back" href="../../../api/my_dl_framework.training.html#my_dl_framework.training.utils.get_lossfunction">[docs]</a><span class="k">def</span> <span class="nf">get_lossfunction</span><span class="p">(</span><span class="n">config</span><span class="p">:</span> <span class="n">Dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Get a loss function</span>
+<span class="sd">    :param config:          Dict with config</span>
+<span class="sd">    :return:                loss_function object</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;loss_name&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;cross_entropy&quot;</span><span class="p">:</span>
+        <span class="n">loss_function</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">CrossEntropyLoss</span><span class="p">(</span><span class="n">weight</span><span class="o">=</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;loss_weights&#39;</span><span class="p">]</span> <span class="k">if</span> <span class="s1">&#39;loss_weights&#39;</span> <span class="ow">in</span> <span class="n">config</span> <span class="k">else</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Unknown loss name </span><span class="si">{</span><span class="n">config</span><span class="p">[</span><span class="s2">&quot;loss_name&quot;</span><span class="p">]</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">loss_function</span></div>
+
+
+<div class="viewcode-block" id="get_optimizer"><a class="viewcode-back" href="../../../api/my_dl_framework.training.html#my_dl_framework.training.utils.get_optimizer">[docs]</a><span class="k">def</span> <span class="nf">get_optimizer</span><span class="p">(</span><span class="n">config</span><span class="p">:</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">model</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">torch</span><span class="o">.</span><span class="n">optim</span><span class="o">.</span><span class="n">Optimizer</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Get an optimizer</span>
+<span class="sd">    :param config:      Dict with config</span>
+<span class="sd">    :param model:       Torch model</span>
+<span class="sd">    :return:            optimizer object</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;optimizer&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;Adam&quot;</span><span class="p">:</span>
+        <span class="n">optimizer</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">optim</span><span class="o">.</span><span class="n">Adam</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">parameters</span><span class="p">(),</span> <span class="n">lr</span><span class="o">=</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;learning_rate&#39;</span><span class="p">])</span>
+    <span class="k">elif</span> <span class="n">config</span><span class="p">[</span><span class="s2">&quot;optimizer&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;SGDM&quot;</span><span class="p">:</span>
+        <span class="n">optimizer</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">optim</span><span class="o">.</span><span class="n">SGD</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">parameters</span><span class="p">(),</span>
+                                    <span class="n">lr</span><span class="o">=</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;learning_rate&#39;</span><span class="p">],</span>
+                                    <span class="n">momentum</span><span class="o">=</span><span class="n">config</span><span class="p">[</span><span class="s2">&quot;sgd_momentum&quot;</span><span class="p">])</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Unknown optimizer name </span><span class="si">{</span><span class="n">config</span><span class="p">[</span><span class="s2">&quot;optimizer&quot;</span><span class="p">]</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">optimizer</span></div>
+
+
+<div class="viewcode-block" id="get_lr_scheduler"><a class="viewcode-back" href="../../../api/my_dl_framework.training.html#my_dl_framework.training.utils.get_lr_scheduler">[docs]</a><span class="k">def</span> <span class="nf">get_lr_scheduler</span><span class="p">(</span><span class="n">config</span><span class="p">:</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">optimizer</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">optim</span><span class="o">.</span><span class="n">Optimizer</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Get a learning rate scheduler</span>
+<span class="sd">    :param config:          Dict with config</span>
+<span class="sd">    :param optimizer:       Torch optimizer</span>
+<span class="sd">    :return:                lr_scheduler object</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">config</span><span class="p">[</span><span class="s1">&#39;lr_scheduler&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;stepwise&quot;</span><span class="p">:</span>
+        <span class="n">lr_scheduler</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">optim</span><span class="o">.</span><span class="n">lr_scheduler</span><span class="o">.</span><span class="n">StepLR</span><span class="p">(</span><span class="n">optimizer</span><span class="p">,</span> <span class="n">step_size</span><span class="o">=</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;step_size&#39;</span><span class="p">],</span> <span class="n">gamma</span><span class="o">=</span><span class="mi">1</span><span class="o">/</span><span class="n">np</span><span class="o">.</span><span class="n">float32</span><span class="p">(</span><span class="n">config</span><span class="p">[</span><span class="s1">&#39;lr_step&#39;</span><span class="p">]))</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Unknown lr scheduler name </span><span class="si">{</span><span class="n">config</span><span class="p">[</span><span class="s2">&quot;lr_scheduler&quot;</span><span class="p">]</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">lr_scheduler</span></div>
+
+
+<div class="viewcode-block" id="get_and_log_metrics_classification"><a class="viewcode-back" href="../../../api/my_dl_framework.training.html#my_dl_framework.training.utils.get_and_log_metrics_classification">[docs]</a><span class="k">def</span> <span class="nf">get_and_log_metrics_classification</span><span class="p">(</span><span class="n">eval_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+                                       <span class="n">dataloader</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">DataLoader</span><span class="p">,</span>
+                                       <span class="n">model</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">,</span>
+                                       <span class="n">config</span><span class="p">:</span> <span class="n">Dict</span><span class="p">,</span>
+                                       <span class="n">logger</span><span class="p">:</span> <span class="n">Logger</span><span class="p">,</span>
+                                       <span class="n">epoch</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+                                       <span class="n">curr_subfolder</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+                                       <span class="n">use_clearml</span><span class="p">:</span> <span class="nb">bool</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Dict</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Function that calls the metric evaluation and then logs it ClearML and disk</span>
+<span class="sd">    :param eval_name:       Name of the evaluation, e.g. train or test</span>
+<span class="sd">    :param dataloader:      Dataloader to draw samples from</span>
+<span class="sd">    :param model:           Model</span>
+<span class="sd">    :param config:          Config dict</span>
+<span class="sd">    :param logger:          ClearML logger</span>
+<span class="sd">    :param epoch:           Epoch for logging</span>
+<span class="sd">    :param curr_subfolder:  Subfolder where to store local metrics</span>
+<span class="sd">    :param use_clearml:     Whether clearml is used</span>
+<span class="sd">    :return:                Metrics, predictions, and targets</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Validating on set </span><span class="si">{</span><span class="n">eval_name</span><span class="si">}</span><span class="s1"> of length </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">dataloader</span><span class="p">)</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+    <span class="n">metrics</span><span class="p">,</span> <span class="n">plots</span><span class="p">,</span> <span class="n">pred</span><span class="p">,</span> <span class="n">tar</span> <span class="o">=</span> <span class="n">validate_model_classification</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="n">model</span><span class="p">,</span> <span class="n">dataloader</span><span class="o">=</span><span class="n">dataloader</span><span class="p">,</span> <span class="n">config</span><span class="o">=</span><span class="n">config</span><span class="p">,</span> <span class="n">max_num_batches</span><span class="o">=</span><span class="n">config</span><span class="p">[</span><span class="s2">&quot;max_num_batches_val&quot;</span><span class="p">],</span> <span class="n">use_cleaml</span><span class="o">=</span><span class="n">use_clearml</span><span class="p">)</span>
+    <span class="c1"># convert to pandas DF</span>
+    <span class="n">metric_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="o">.</span><span class="n">from_dict</span><span class="p">(</span><span class="n">metrics</span><span class="p">)</span>
+    <span class="n">metric_df</span><span class="p">[</span><span class="s2">&quot;classes&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">config</span><span class="p">[</span><span class="s2">&quot;class_names&quot;</span><span class="p">]</span> <span class="o">+</span> <span class="p">[</span><span class="s2">&quot;Avg&quot;</span><span class="p">]</span>
+    <span class="n">metric_df</span><span class="o">.</span><span class="n">set_index</span><span class="p">(</span><span class="s2">&quot;classes&quot;</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Metrics&quot;</span> <span class="o">+</span> <span class="s2">&quot;-&quot;</span> <span class="o">*</span> <span class="mi">20</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">metric_df</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;-&quot;</span> <span class="o">*</span> <span class="mi">25</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">use_clearml</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">report_table</span><span class="p">(</span><span class="n">title</span><span class="o">=</span><span class="s2">&quot;Metrics&quot;</span><span class="p">,</span> <span class="n">series</span><span class="o">=</span><span class="s2">&quot;Metrics&quot;</span><span class="p">,</span> <span class="n">iteration</span><span class="o">=</span><span class="n">epoch</span><span class="p">,</span> <span class="n">table_plot</span><span class="o">=</span><span class="n">metric_df</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">metric_name</span><span class="p">,</span> <span class="n">metric_val</span> <span class="ow">in</span> <span class="n">metrics</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">report_scalar</span><span class="p">(</span><span class="n">title</span><span class="o">=</span><span class="n">metric_name</span><span class="p">,</span> 
+                                 <span class="n">series</span><span class="o">=</span><span class="n">eval_name</span> <span class="o">+</span> <span class="s2">&quot; &quot;</span> <span class="o">+</span> <span class="n">metric_name</span><span class="p">,</span>
+                                 <span class="n">value</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">metric_val</span><span class="p">),</span>
+                                 <span class="n">iteration</span><span class="o">=</span><span class="n">epoch</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">plot_name</span><span class="p">,</span> <span class="n">plot</span> <span class="ow">in</span> <span class="n">plots</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="c1"># Plotly figure</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">plot</span><span class="p">,</span> <span class="n">plotly</span><span class="o">.</span><span class="n">graph_objs</span><span class="o">.</span><span class="n">Figure</span><span class="p">):</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">report_plotly</span><span class="p">(</span><span class="n">title</span><span class="o">=</span><span class="n">eval_name</span> <span class="o">+</span> <span class="s2">&quot; &quot;</span> <span class="o">+</span> <span class="n">plot_name</span><span class="p">,</span> <span class="n">series</span><span class="o">=</span><span class="n">eval_name</span> <span class="o">+</span> <span class="s2">&quot; &quot;</span> <span class="o">+</span> <span class="n">plot_name</span><span class="p">,</span> <span class="n">figure</span><span class="o">=</span><span class="n">plot</span><span class="p">,</span> <span class="n">iteration</span><span class="o">=</span><span class="n">epoch</span><span class="p">)</span>
+    <span class="c1"># Save metrics</span>
+    <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">curr_subfolder</span><span class="p">,</span> <span class="n">eval_name</span> <span class="o">+</span> <span class="s2">&quot;_metrics.json&quot;</span><span class="p">)):</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">curr_subfolder</span><span class="p">,</span> <span class="n">eval_name</span> <span class="o">+</span> <span class="s2">&quot;_metrics.json&quot;</span><span class="p">),</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;utf-8&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">file</span><span class="p">:</span>
+            <span class="n">metrics_all</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">file</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">metrics_all</span><span class="p">:</span>
+            <span class="n">metrics_all</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">metrics_all</span><span class="p">[</span><span class="n">key</span><span class="p">])</span>
+        <span class="n">metrics_all</span><span class="p">[</span><span class="n">epoch</span><span class="p">]</span> <span class="o">=</span> <span class="n">metrics</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">metrics_all</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+        <span class="n">metrics_all</span><span class="p">[</span><span class="s2">&quot;best_epoch&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">epoch</span>
+        <span class="n">metrics_all</span><span class="p">[</span><span class="n">epoch</span><span class="p">]</span> <span class="o">=</span> <span class="n">metrics</span>
+    <span class="c1"># Save</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">curr_subfolder</span><span class="p">,</span> <span class="n">eval_name</span> <span class="o">+</span> <span class="s2">&quot;_metrics.json&quot;</span><span class="p">),</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;utf-8&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">file</span><span class="p">:</span>
+        <span class="n">json</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">metrics_all</span><span class="p">,</span> <span class="n">file</span><span class="p">,</span> <span class="bp">cls</span><span class="o">=</span><span class="n">NumpyEncoder</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">metrics_all</span><span class="p">,</span> <span class="n">pred</span><span class="p">,</span> <span class="n">tar</span></div>
+
+
+<div class="viewcode-block" id="NumpyEncoder"><a class="viewcode-back" href="../../../api/my_dl_framework.training.html#my_dl_framework.training.utils.NumpyEncoder">[docs]</a><span class="k">class</span> <span class="nc">NumpyEncoder</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">JSONEncoder</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Numpy encoder for JSON saving.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+<div class="viewcode-block" id="NumpyEncoder.default"><a class="viewcode-back" href="../../../api/my_dl_framework.training.html#my_dl_framework.training.utils.NumpyEncoder.default">[docs]</a>    <span class="k">def</span> <span class="nf">default</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">o</span><span class="p">):</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">o</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">o</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">json</span><span class="o">.</span><span class="n">JSONEncoder</span><span class="o">.</span><span class="n">default</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">o</span><span class="p">)</span></div></div>
+
+
+<div class="viewcode-block" id="plot_example_batch"><a class="viewcode-back" href="../../../api/my_dl_framework.training.html#my_dl_framework.training.utils.plot_example_batch">[docs]</a><span class="k">def</span> <span class="nf">plot_example_batch</span><span class="p">(</span><span class="n">images</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">targets</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">idx</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">save_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">config</span><span class="p">:</span> <span class="n">Dict</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot; Plots some example batches into clearml and to local path</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">batch_size</span> <span class="o">=</span> <span class="n">images</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">fig</span><span class="p">,</span> <span class="n">axes</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="n">batch_size</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">5</span> <span class="o">*</span> <span class="n">batch_size</span><span class="p">,</span> <span class="mi">20</span><span class="p">))</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">batch_size</span><span class="p">):</span>
+        <span class="n">image</span> <span class="o">=</span> <span class="n">images</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="p">:,</span> <span class="p">:]</span><span class="o">.</span><span class="n">numpy</span><span class="p">()</span>
+        <span class="n">target</span> <span class="o">=</span> <span class="n">config</span><span class="p">[</span><span class="s2">&quot;class_names&quot;</span><span class="p">][</span><span class="n">targets</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">item</span><span class="p">()]</span>
+        <span class="n">clearml_logger</span> <span class="o">=</span> <span class="n">Logger</span><span class="o">.</span><span class="n">current_logger</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">clearml_logger</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">clearml_logger</span><span class="o">.</span><span class="n">report_image</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2"> of </span><span class="si">{</span><span class="n">idx</span><span class="si">}</span><span class="s2"> y=</span><span class="si">{</span><span class="n">target</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;debug example&quot;</span><span class="p">,</span>
+                <span class="n">iteration</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+                <span class="n">image</span><span class="o">=</span><span class="n">image</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="n">axes</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">image</span><span class="p">,</span> <span class="n">cmap</span><span class="o">=</span><span class="s2">&quot;gray&quot;</span><span class="p">)</span>
+        <span class="n">axes</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;Target </span><span class="si">{</span><span class="n">target</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
+        <span class="n">axes</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">set_axis_off</span><span class="p">()</span>
+    <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">save_path</span><span class="p">,</span> <span class="s2">&quot;example_batches&quot;</span><span class="p">),</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">fig</span><span class="o">.</span><span class="n">savefig</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">save_path</span><span class="p">,</span> <span class="s2">&quot;example_batches&quot;</span><span class="p">,</span> <span class="s2">&quot;batch_&quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">idx</span><span class="p">)</span> <span class="o">+</span> <span class="s2">&quot;.png&quot;</span><span class="p">),</span> <span class="n">bbox_inches</span><span class="o">=</span><span class="s1">&#39;tight&#39;</span><span class="p">,</span> <span class="n">pad_inches</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">dpi</span><span class="o">=</span><span class="mi">300</span><span class="p">)</span></div>
+</pre></div>
+
+           </div>
+           
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &#169; Copyright 2022, Nils Gessert.
+
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>

@@ -1,0 +1,23 @@
+my\_dl\_framework.evaluation namespace
+======================================
+
+.. py:module:: my_dl_framework.evaluation
+
+Submodules
+----------
+
+my\_dl\_framework.evaluation.eval\_and\_predict module
+------------------------------------------------------
+
+.. automodule:: my_dl_framework.evaluation.eval_and_predict
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+my\_dl\_framework.evaluation.utils module
+-----------------------------------------
+
+.. automodule:: my_dl_framework.evaluation.utils
+   :members:
+   :undoc-members:
+   :show-inheritance:

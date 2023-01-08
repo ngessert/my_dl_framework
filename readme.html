@@ -1,0 +1,344 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="Docutils 0.19: https://docutils.sourceforge.io/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <title>My Deep Learning Framework &mdash; MyDLFramework 0.1 documentation</title>
+  
+
+  
+  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+
+  
+  
+
+  
+  
+
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+        <script src="_static/doctools.js"></script>
+        <script src="_static/sphinx_highlight.js"></script>
+    
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+
+    
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Training" href="training.html" />
+    <link rel="prev" title="My Dl Framework" href="index.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="index.html" class="icon icon-home"> MyDLFramework
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                0.1
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Overview</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#getting-started">Getting Started</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#prepare-data-and-config">Prepare Data and Config</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#training">Training</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#evaluation">Evaluation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#ensembling">Ensembling</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="training.html">Training</a></li>
+<li class="toctree-l1"><a class="reference internal" href="evaluation.html">Evaluation and Ensembling</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api/modules.html">Module Reference</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">MyDLFramework</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="index.html" class="icon icon-home"></a> &raquo;</li>
+        
+      <li>My Deep Learning Framework</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            <a href="_sources/readme.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <section id="my-deep-learning-framework">
+<span id="readme"></span><h1>My Deep Learning Framework<a class="headerlink" href="#my-deep-learning-framework" title="Permalink to this heading">¶</a></h1>
+<p><img alt="Tests Status" src="https://github.com/ngessert/my_dl_framework/actions/workflows/main.yml/badge.svg?branch=develop" /> <img alt="Docs Status" src="https://github.com/ngessert/my_dl_framework/actions/workflows/documentation.yml/badge.svg?branch=develop" /></p>
+<p>A Pytorch (lightning)-based framework for deep learning. The purpose of this repo is to provide tools for training and evaluating image-based deep learning models with prepared datasets.
+It is focused on challenge scenarios where the goal is to train many models that are evaluated with test-time augmentation, and ensembled together.</p>
+<p>Many components in this repo are inspired by my challenge-winning code repo that can be found here: <a class="reference external" href="https://github.com/ngessert/isic2019/">ISIC Challenge Code</a>.</p>
+<p><strong>Many things are WIP</strong>, if you would to contribute, open an issue/a PR or message me!</p>
+<p>Features:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Based on <a class="reference external" href="https://www.pytorchlightning.ai">Pytorch Lightning</a></p></li>
+<li><p>Experiment tracking &amp; model storing with <a class="reference external" href="https://clear.ml">ClearML</a> - a powerful MLops tool</p></li>
+<li><p>A training config system with yaml files</p></li>
+<li><p>Job scheduling with ClearML workers &amp; queues</p></li>
+<li><p>Test-time augmentation</p></li>
+<li><p>Evaluation &amp; ensembling (also with ClearML artifacts)</p></li>
+<li><p>Supported task</p>
+<ul>
+<li><p>Image classification</p></li>
+</ul>
+</li>
+<li><p>Supported datasets</p>
+<ul>
+<li><p>RSNA Pneumonia Chest X-ray Challenge (binary classification)</p></li>
+</ul>
+</li>
+</ul>
+</div></blockquote>
+<p>Planned features:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Supported tasks</p>
+<ul>
+<li><p>Image segmentation</p></li>
+<li><p>Image bounding box detection</p></li>
+</ul>
+</li>
+<li><p>Supported datasets</p>
+<ul>
+<li><p>ISIC Skin Lesion Classification Challenge</p></li>
+</ul>
+</li>
+<li><p>More documentation</p></li>
+<li><p>More unit tests/regression tests</p></li>
+</ul>
+</div></blockquote>
+<p>Documentation:</p>
+<blockquote>
+<div><p><a class="reference external" href="https://deep-echo.philips-internal.com/">Documentation</a></p>
+</div></blockquote>
+<p>Repo:</p>
+<blockquote>
+<div><p><a class="reference external" href="https://github.com/ngessert/my_dl_framework">https://github.com/ngessert/my_dl_framework</a></p>
+</div></blockquote>
+<section id="getting-started">
+<h2>Getting Started<a class="headerlink" href="#getting-started" title="Permalink to this heading">¶</a></h2>
+<p>If you plan to do local trainings only, you can clone the repo, e.g. via SSH with:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">git</span> <span class="n">clone</span> <span class="n">git</span><span class="nd">@github</span><span class="o">.</span><span class="n">com</span><span class="p">:</span><span class="n">ngessert</span><span class="o">/</span><span class="n">my_dl_framework</span><span class="o">.</span><span class="n">git</span>
+</pre></div>
+</div>
+<p>If you plan to use <strong>scheduling</strong> via ClearML workers &amp; queues, I recommend that you fork the repo as you will use
+it to sync your config files.</p>
+<p>Setup a new python environment, e.g. with virtual env or miniforge. The recommended python version is 3.9 (that’s what I tested). Then, install the requirements and package with:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">pip</span> <span class="n">install</span> <span class="o">-</span><span class="n">r</span> <span class="n">requirements</span><span class="o">.</span><span class="n">txt</span>
+<span class="n">python</span> <span class="n">setup</span><span class="o">.</span><span class="n">py</span> <span class="n">develop</span>
+</pre></div>
+</div>
+</section>
+<section id="prepare-data-and-config">
+<h2>Prepare Data and Config<a class="headerlink" href="#prepare-data-and-config" title="Permalink to this heading">¶</a></h2>
+<p>Download the data (e.g. the <a class="reference external" href="https://www.kaggle.com/competitions/rsna-pneumonia-detection-challenge/data">RSNA Challenge Data</a>) and place it an directory, e.g., named <cite>RSNA_challenge</cite>.
+This directory should contain a folder with the images (e.g. named <cite>training_images</cite>) and the CSV with labels (e.g. named <cite>stage_2_train_labels.csv</cite>).</p>
+<p>Optionally, you can create a cross-validation (CV) split file (or you the default one for the RSNA challenge <cite>cv_splitscv_split_3fold.json</cite>):</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">python</span> <span class="n">my_dl_framework</span>\\<span class="n">data</span>\\<span class="n">define_cv_split_rsnachallenge</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">num_cv</span><span class="o">=</span><span class="mi">3</span> <span class="o">--</span><span class="n">save_path</span><span class="o">=</span><span class="n">C</span><span class="p">:</span>\\<span class="n">cv_split_3fold</span><span class="o">.</span><span class="n">json</span>
+</pre></div>
+</div>
+<p>We will treat any training as a CV training. Even if you just want to train one model with a simple train/val, split we do that by defining CV splits in a JSON file.
+This ensures that data splits are guaranteed to be reproducible.</p>
+<p>Next, prepare a training config by copying the config <cite>configs/test_config.yaml</cite>. Update the location of your training data and CV-split file:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">base_path</span><span class="p">:</span> <span class="s2">&quot;C:</span><span class="se">\\</span><span class="s2">data</span><span class="se">\\</span><span class="s2">RSNA_challenge&quot;</span>
+<span class="n">csv_name</span><span class="p">:</span> <span class="s2">&quot;stage_2_train_labels.csv&quot;</span>
+<span class="n">training_image_dir</span><span class="p">:</span> <span class="s2">&quot;training_images&quot;</span>
+<span class="n">data_split_file</span><span class="p">:</span> <span class="s2">&quot;C:</span><span class="se">\\</span><span class="s2">cv_split_3fold.json&quot;</span>
+</pre></div>
+</div>
+<p>There are many other options that are explained in the <a class="reference external" href="https://ngessert.github.io/my_dl_framework/training.html">documentation</a>.</p>
+</section>
+<section id="training">
+<h2>Training<a class="headerlink" href="#training" title="Permalink to this heading">¶</a></h2>
+<p>If you want to use ClearML for experiment tracking, set up an account at <a class="reference external" href="https://clear.ml">https://clear.ml</a>.
+Log in and generate App credentials by going to Settings -&gt; Workspaces. Copy the generated credentials into the <cite>clearml.conf</cite> file in the repo root.
+Then, copy the clearml.conf file to your machines home directory.</p>
+<p>You can run the training locally with:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">python</span> <span class="n">my_dl_framework</span>\\<span class="n">training</span>\\<span class="n">train_pl</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">config</span><span class="o">=</span><span class="n">C</span><span class="p">:</span>\\<span class="n">sources</span>\\<span class="n">my_dl_framework</span>\\<span class="n">configs</span>\\<span class="n">test_config</span><span class="o">.</span><span class="n">yaml</span> <span class="o">-</span><span class="n">cl</span> <span class="n">clearml</span>
+</pre></div>
+</div>
+<p>If you want to run training with ClearML workers &amp; queues, please check the <a class="reference external" href="https://ngessert.github.io/my_dl_framework/training.html">documentation</a>.</p>
+</section>
+<section id="evaluation">
+<h2>Evaluation<a class="headerlink" href="#evaluation" title="Permalink to this heading">¶</a></h2>
+<p>Afer training, you can run evaluations and prediction on the training data or new data. You can either use a <strong>local</strong> folder
+with trained model checkpoints or a ClearML <strong>job id</strong>. For the latter case, the model checkpoints, configs, etc. are downloaded from
+ClearML.</p>
+<p>Evaluation with local folder:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">python</span> <span class="n">my_dl_framework</span>\<span class="n">evaluation</span>\<span class="n">eval_and_predict</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">folder</span><span class="o">=</span><span class="n">experiments</span>\<span class="n">training1</span><span class="o">--</span><span class="n">image_path</span><span class="o">=</span><span class="n">C</span><span class="p">:</span>\\<span class="n">training_images</span> <span class="o">-</span><span class="n">cl</span>
+</pre></div>
+</div>
+<p>Also, you can either run an evaluation in <strong>CV mode</strong> (on the training dataset) or <strong>prediction mode</strong> on new data.
+For the former, each CV model is applied to its respective data subset and the predictions are concatenated together for
+evaluation across CV splits. For the latter, each CV model is applied to all data and predictions are averaged across folds.</p>
+<p>For <strong>CV mode</strong> add the flag <cite>–cv_eval</cite>.</p>
+<p>The <strong>prediction mode</strong> is meant for new, unlabeled data, however, you can also provide CSV file in case labels are available: <cite>–label_csv_path=label_file.csv</cite>.</p>
+<p>There are multiple <strong>test-time augmentation</strong> options that can be arbitrarily combined. E.g., use flipping augmentation with <cite>–tta_flip_horz</cite> and/or <cite>–tta_flip_vert</cite>.</p>
+<p>For each evaluation run, a new subfolder is created in the original training folder, containing the predictions and logs. Also,
+metrics and prediction files are logged in ClearML. Multiple predictions can be used for ensembling.</p>
+<p>For more options, such as limiting batches, skipping intermediate metrics, and test-time augmentation, check the <a class="reference external" href="https://ngessert.github.io/my_dl_framework/training.html">documentation</a>.</p>
+</section>
+<section id="ensembling">
+<h2>Ensembling<a class="headerlink" href="#ensembling" title="Permalink to this heading">¶</a></h2>
+<p>After evaluation, you can ensemble multiple models together: TODO</p>
+</section>
+</section>
+
+
+           </div>
+           
+          </div>
+          <footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+        <a href="training.html" class="btn btn-neutral float-right" title="Training" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="index.html" class="btn btn-neutral float-left" title="My Dl Framework" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &#169; Copyright 2022, Nils Gessert.
+
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>

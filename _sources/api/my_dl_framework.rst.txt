@@ -1,0 +1,16 @@
+my\_dl\_framework namespace
+===========================
+
+.. py:module:: my_dl_framework
+
+Subpackages
+-----------
+
+.. toctree::
+   :maxdepth: 4
+
+   my_dl_framework.data
+   my_dl_framework.evaluation
+   my_dl_framework.models
+   my_dl_framework.training
+   my_dl_framework.utils

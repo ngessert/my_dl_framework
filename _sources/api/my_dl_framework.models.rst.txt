@@ -1,0 +1,15 @@
+my\_dl\_framework.models namespace
+==================================
+
+.. py:module:: my_dl_framework.models
+
+Submodules
+----------
+
+my\_dl\_framework.models.pl\_class\_wrapper module
+--------------------------------------------------
+
+.. automodule:: my_dl_framework.models.pl_class_wrapper
+   :members:
+   :undoc-members:
+   :show-inheritance:
