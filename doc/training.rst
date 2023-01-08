@@ -1,12 +1,13 @@
+================
 Training
-==========
+================
 
 This section provides a detailed overview on the options for training.
 
 First, you need to set up the data and a base config with the correct structure.
 
 Prepare Data and Config
-=============================
+=======
 
 Download the data (e.g. the `RSNA Challenge Data <https://www.kaggle.com/competitions/rsna-pneumonia-detection-challenge/data>`_) and place it an directory, e.g., named `RSNA_challenge`.
 This directory should contain a folder with the images (e.g. named `training_images`) and the CSV with labels (e.g. named `stage_2_train_labels.csv`).
@@ -27,7 +28,7 @@ Next, prepare a training config by copying the config `configs/test_config.yaml`
 
 
 Execute the Training
-=============================
+=======
 
 If you want to use ClearML for experiment tracking, set up an account at `https://clear.ml <https://clear.ml>`_.
 Log in and generate App credentials by going to Settings -> Workspaces. Copy the generated credentials into the `clearml.conf` file in the repo root.
@@ -39,12 +40,12 @@ You can run the training locally with::
 
 
 Config Options
-=============================
+=======
 
 The following config options are available: TODO
 
 Remote Training and ClearML Workers
-=============================
+=======
 
 You can also use ClearML queues and workers to schedule multiple jobs. This can also make sense if just work
 with a single, local computer for running your trainings.

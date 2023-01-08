@@ -1,5 +1,6 @@
+================
 My Deep Learning Framework
-==========================
+================
 
 |Tests Status| |Docs Status|
 
@@ -49,7 +50,7 @@ Repo:
     `https://github.com/ngessert/my_dl_framework <https://github.com/ngessert/my_dl_framework>`_
 
 Getting Started
-=============================
+=======
 
 If you plan to do local trainings only, you can clone the repo, e.g. via SSH with::
 
@@ -66,7 +67,7 @@ Setup a new python environment, e.g. with virtual env or miniforge. The recommen
 
 
 Prepare Data and Config
-=============================
+=======
 
 Download the data (e.g. the `RSNA Challenge Data <https://www.kaggle.com/competitions/rsna-pneumonia-detection-challenge/data>`_) and place it an directory, e.g., named `RSNA_challenge`.
 This directory should contain a folder with the images (e.g. named `training_images`) and the CSV with labels (e.g. named `stage_2_train_labels.csv`).
@@ -85,10 +86,10 @@ Next, prepare a training config by copying the config `configs/test_config.yaml`
     training_image_dir: "training_images"
     data_split_file: "C:\\cv_split_3fold.json"
 
-There are many other options that are explained in the `documentation <>`_.
+There are many other options that are explained in the `documentation <https://ngessert.github.io/my_dl_framework/training.html>`_.
 
 Training
-=============================
+=======
 
 If you want to use ClearML for experiment tracking, set up an account at `https://clear.ml <https://clear.ml>`_.
 Log in and generate App credentials by going to Settings -> Workspaces. Copy the generated credentials into the `clearml.conf` file in the repo root.
@@ -98,10 +99,10 @@ You can run the training locally with::
 
     python my_dl_framework\\training\\train_pl.py --config=C:\\sources\\my_dl_framework\\configs\\test_config.yaml -cl clearml
 
-If you want to run training with ClearML workers & queues, please check the `documentation <>`_.
+If you want to run training with ClearML workers & queues, please check the `documentation <https://ngessert.github.io/my_dl_framework/training.html>`_.
 
 Evaluation
-=============================
+=======
 
 Afer training, you can run evaluations and prediction on the training data or new data. You can either use a **local** folder
 with trained model checkpoints or a ClearML **job id**. For the latter case, the model checkpoints, configs, etc. are downloaded from
@@ -124,10 +125,10 @@ There are multiple **test-time augmentation** options that can be arbitrarily co
 For each evaluation run, a new subfolder is created in the original training folder, containing the predictions and logs. Also,
 metrics and prediction files are logged in ClearML. Multiple predictions can be used for ensembling.
 
-For more options, such as limiting batches, skipping intermediate metrics, and test-time augmentation, check the `documentation <>`_.
+For more options, such as limiting batches, skipping intermediate metrics, and test-time augmentation, check the `documentation <https://ngessert.github.io/my_dl_framework/training.html>`_.
 
 Ensembling
-=============================
+=======
 
 After evaluation, you can ensemble multiple models together: TODO
 
