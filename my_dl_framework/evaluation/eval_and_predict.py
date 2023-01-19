@@ -1,28 +1,20 @@
 """Prediction script. Works with or without targets. If there are targets, get metrics as well.
-Options:
-    --folder=<folder>     folder to run prediction on
-    -cl --clearml         use clearml.
-Example:
-    python my_dl_framework\\evaluation\\eval_and_predict.py --folder=C:\\data\\RSNA_challenge\\experiments\\test_config.yaml20-02-2022-20-38-12 -cl clearml
+
 """
 
 import argparse
-import ast
 import shutil
 from datetime import datetime
 import json
 import yaml
 import os
 import numpy as np
-import torch
-import pandas as pd
 from glob import glob
 from torch.utils.data import DataLoader
 from typing import Optional
 
 from my_dl_framework.data.get_dataset import get_dataset
 from my_dl_framework.data.utils import collate_aug_batch
-from my_dl_framework.evaluation.utils import calculate_metrics
 from my_dl_framework.models.pl_class_wrapper import PLClassificationWrapper
 import pytorch_lightning as pl
 from clearml import Task, TaskTypes
