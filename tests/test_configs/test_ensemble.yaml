@@ -1,5 +1,5 @@
 eval_folders:
-  - tests/test_data/rsna_binary/exp_for_val/pred_and_eval
+  - tests/test_data/rsna_binary/exp_for_val/eval_and_pred
 # You can also specify clearml IDs from where the predictions will be pulled
 clearml_ids: []
 # Downloaded clearml items and ensemble results stored in this path
