@@ -1,28 +1,20 @@
 """Prediction script. Works with or without targets. If there are targets, get metrics as well.
-Options:
-    --folder=<folder>     folder to run prediction on
-    -cl --clearml         use clearml.
-Example:
-    python my_dl_framework\\evaluation\\eval_and_predict.py --folder=C:\\data\\RSNA_challenge\\experiments\\test_config.yaml20-02-2022-20-38-12 -cl clearml
+
 """
 
 import argparse
-import ast
 import shutil
 from datetime import datetime
 import json
 import yaml
 import os
 import numpy as np
-import torch
-import pandas as pd
 from glob import glob
 from torch.utils.data import DataLoader
 from typing import Optional
 
 from my_dl_framework.data.get_dataset import get_dataset
 from my_dl_framework.data.utils import collate_aug_batch
-from my_dl_framework.evaluation.utils import calculate_metrics
 from my_dl_framework.models.pl_class_wrapper import PLClassificationWrapper
 import pytorch_lightning as pl
 from clearml import Task, TaskTypes
@@ -142,9 +134,14 @@ def run_prediction(folder: str,
         if tta_multi_eq_crop:
             tags.append(f"TTAMEQ{tta_multi_eq_crop}")
         task.add_tags(tags)
+    # Upload config for potential later use
+    if clearml:
+        task.upload_artifact(name="training_config", artifact_object=os.path.join(folder, "config.yaml"))
     # for storing predictions, there may be many evaluations
     curr_pred_folder = os.path.join(folder, "pred_and_eval_" + datetime.now().strftime("%d-%m-%Y-%H-%M-%S"))
     os.makedirs(curr_pred_folder, exist_ok=True)
+    # copy config for ensembling later on
+    shutil.copy(os.path.join(folder, "config.yaml"), os.path.join(curr_pred_folder, "training_config.yaml"))
     pred_list = list()
     pred_train_val_list = list()
     tar_list = list()
@@ -180,10 +177,10 @@ def run_prediction(folder: str,
                                   tta_options=tta_options,
                                   is_training=False)
         print(f'Size validation dataset {len(dataset_val)}')
-        batcH_size_adj = config["batch_size"] // batch_size_factor
-        if batcH_size_adj <= 0:
-            batcH_size_adj = 1
-        dataloader_val = DataLoader(dataset=dataset_val, batch_size=batcH_size_adj, shuffle=False,
+        batch_size_adj = config["batch_size"] // batch_size_factor
+        if batch_size_adj <= 0:
+            batch_size_adj = 1
+        dataloader_val = DataLoader(dataset=dataset_val, batch_size=batch_size_adj, shuffle=False,
                                     num_workers=8, pin_memory=True, collate_fn=collate_aug_batch if tta_options else None)
         if eval_on_train and cv_eval:
             dataset_train_val = get_dataset(config=config,
@@ -193,7 +190,7 @@ def run_prediction(folder: str,
                                             tta_options=tta_options,
                                             is_training=False)
             print(f'Size validation dataset {len(dataset_train_val)}')
-            dataloader_train_val = DataLoader(dataset=dataset_train_val, batch_size=batcH_size_adj, shuffle=False,
+            dataloader_train_val = DataLoader(dataset=dataset_train_val, batch_size=batch_size_adj, shuffle=False,
                                               num_workers=8, pin_memory=True, collate_fn=collate_aug_batch if tta_options else None)
         else:
             dataloader_train_val = None
@@ -250,8 +247,8 @@ def run_prediction(folder: str,
             model.is_trainval = False
         if clearml and not dont_log_splits:
             # Store intermediate preds from CV
-            task.upload_artifact(f"pred arr CV{cv_idx+1}", model.predictions)
-            task.upload_artifact(f"tar arr CV{cv_idx+1}", model.targets)
+            task.upload_artifact(f"pred arr CV{cv_idx+1}", os.path.join(curr_subfolder_cv_pred, "predictions_train_val.npy"))
+            task.upload_artifact(f"tar arr CV{cv_idx+1}", os.path.join(curr_subfolder_cv_pred, "targets_train_val.npy"))
     # Aggregate, if at least one split was present
     if model is not None:
         # Aggregate CV predictions: concat for CV mode, average/vote for prediction mode
@@ -277,8 +274,8 @@ def run_prediction(folder: str,
             np.save(os.path.join(curr_pred_folder, "targets_train_val_all.npy"), tar_train_val_all)
         if clearml:
             # Store intermediate preds from CV
-            task.upload_artifact(f"pred arr {prefix}", pred_all)
-            task.upload_artifact(f"tar arr {prefix}", tar_all)
+            task.upload_artifact(f"pred arr {prefix}", os.path.join(curr_pred_folder, "predictions_all.npy"))
+            task.upload_artifact(f"tar arr {prefix}", os.path.join(curr_pred_folder, "targets_all.npy"))
         # Perform evaluation through last model
         if cv_eval or label_csv_path is not None:
             model.calc_and_log_metrics(loggers=loggers,

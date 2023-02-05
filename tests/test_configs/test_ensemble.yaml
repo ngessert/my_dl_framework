@@ -1,0 +1,14 @@
+eval_folders:
+  - tests/test_data/rsna_binary/exp_for_val/eval_and_pred
+# You can also specify clearml IDs from where the predictions will be pulled
+clearml_ids: []
+# Downloaded clearml items and ensemble results stored in this path
+save_path: tests/test_data/rsna_binary
+# Can be mean or max
+comb_type: mean
+# Can be eval or predict
+ensemble_type: eval
+
+clearml_tags:
+  - Eval
+  - Mean

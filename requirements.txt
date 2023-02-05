@@ -3,7 +3,7 @@ pylint
 pip
 tqdm
 torch==1.13.0
-pytorch-lightning
+pytorch-lightning==1.8.5
 torchvision==0.14.0
 pytest-cov
 pyyaml
@@ -14,3 +14,4 @@ numpy
 pandas
 matplotlib
 pydicom
+lightning-lite==1.8.5
