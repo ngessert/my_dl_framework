@@ -177,10 +177,10 @@ def run_prediction(folder: str,
                                   tta_options=tta_options,
                                   is_training=False)
         print(f'Size validation dataset {len(dataset_val)}')
-        batcH_size_adj = config["batch_size"] // batch_size_factor
-        if batcH_size_adj <= 0:
-            batcH_size_adj = 1
-        dataloader_val = DataLoader(dataset=dataset_val, batch_size=batcH_size_adj, shuffle=False,
+        batch_size_adj = config["batch_size"] // batch_size_factor
+        if batch_size_adj <= 0:
+            batch_size_adj = 1
+        dataloader_val = DataLoader(dataset=dataset_val, batch_size=batch_size_adj, shuffle=False,
                                     num_workers=8, pin_memory=True, collate_fn=collate_aug_batch if tta_options else None)
         if eval_on_train and cv_eval:
             dataset_train_val = get_dataset(config=config,
@@ -190,7 +190,7 @@ def run_prediction(folder: str,
                                             tta_options=tta_options,
                                             is_training=False)
             print(f'Size validation dataset {len(dataset_train_val)}')
-            dataloader_train_val = DataLoader(dataset=dataset_train_val, batch_size=batcH_size_adj, shuffle=False,
+            dataloader_train_val = DataLoader(dataset=dataset_train_val, batch_size=batch_size_adj, shuffle=False,
                                               num_workers=8, pin_memory=True, collate_fn=collate_aug_batch if tta_options else None)
         else:
             dataloader_train_val = None

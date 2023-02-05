@@ -18,7 +18,6 @@ import json
 
 def main(num_cv: int,
          save_path: str):
-    # labels = pd.read_csv(os.path.join(r"C:\data\RSNA_challenge", "stage_2_train_labels.csv"))
     labels = pd.read_csv(os.path.join(r"C:\sources\my_dl_framework\tests\test_data\rsna_binary", "stage_2_train_labels_test.csv"))
     all_cases = labels['patientId'].tolist()
     # For balancing
