@@ -12,8 +12,8 @@ def test_eval_and_pred_script():
                  clearml=False,
                  remote=False)
     found_experiment = False
-    for folder in glob(os.path.join("tests", "test_data", "rsna_binary", "exp_for_val", "*")):
-        if "pred_and_eval" in folder:
+    for folder in glob(os.path.join("tests", "test_data", "rsna_binary", "*")):
+        if "ensemble" in folder:
             assert os.path.exists(os.path.join(folder, "predictions_all.npy")), "predictions_all.npy not found"
             assert os.path.exists(os.path.join(folder, "targets_all.npy")), "targets_all.npy not found"
             found_experiment = True
