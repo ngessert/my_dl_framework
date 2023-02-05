@@ -134,9 +134,14 @@ def run_prediction(folder: str,
         if tta_multi_eq_crop:
             tags.append(f"TTAMEQ{tta_multi_eq_crop}")
         task.add_tags(tags)
+    # Upload config for potential later use
+    if clearml:
+        task.upload_artifact(name="training_config", artifact_object=os.path.join(folder, "config.yaml"))
     # for storing predictions, there may be many evaluations
     curr_pred_folder = os.path.join(folder, "pred_and_eval_" + datetime.now().strftime("%d-%m-%Y-%H-%M-%S"))
     os.makedirs(curr_pred_folder, exist_ok=True)
+    # copy config for ensembling later on
+    shutil.copy(os.path.join(folder, "config.yaml"), os.path.join(curr_pred_folder, "training_config.yaml"))
     pred_list = list()
     pred_train_val_list = list()
     tar_list = list()
@@ -242,8 +247,8 @@ def run_prediction(folder: str,
             model.is_trainval = False
         if clearml and not dont_log_splits:
             # Store intermediate preds from CV
-            task.upload_artifact(f"pred arr CV{cv_idx+1}", model.predictions)
-            task.upload_artifact(f"tar arr CV{cv_idx+1}", model.targets)
+            task.upload_artifact(f"pred arr CV{cv_idx+1}", os.path.join(curr_subfolder_cv_pred, "predictions_train_val.npy"))
+            task.upload_artifact(f"tar arr CV{cv_idx+1}", os.path.join(curr_subfolder_cv_pred, "targets_train_val.npy"))
     # Aggregate, if at least one split was present
     if model is not None:
         # Aggregate CV predictions: concat for CV mode, average/vote for prediction mode
@@ -269,8 +274,8 @@ def run_prediction(folder: str,
             np.save(os.path.join(curr_pred_folder, "targets_train_val_all.npy"), tar_train_val_all)
         if clearml:
             # Store intermediate preds from CV
-            task.upload_artifact(f"pred arr {prefix}", pred_all)
-            task.upload_artifact(f"tar arr {prefix}", tar_all)
+            task.upload_artifact(f"pred arr {prefix}", os.path.join(curr_pred_folder, "predictions_all.npy"))
+            task.upload_artifact(f"tar arr {prefix}", os.path.join(curr_pred_folder, "targets_all.npy"))
         # Perform evaluation through last model
         if cv_eval or label_csv_path is not None:
             model.calc_and_log_metrics(loggers=loggers,

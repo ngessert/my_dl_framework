@@ -1,10 +1,9 @@
 eval_folders:
-  - C:\data\RSNA_challenge\experiments\test_config.yaml05-01-2023-15-36-38\pred_and_eval_04-02-2023-22-44-50
+  - tests/test_data/rsna_binary/exp_for_val/pred_and_eval
 # You can also specify clearml IDs from where the predictions will be pulled
-clearml_ids:
-  - 385a362b23384e65a1898084dcc6cf9d
+clearml_ids: []
 # Downloaded clearml items and ensemble results stored in this path
-save_path: C:\data\RSNA_challenge\experiments
+save_path: tests/test_data/rsna_binary
 # Can be mean or max
 comb_type: mean
 # Can be eval or predict
