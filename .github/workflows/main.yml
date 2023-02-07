@@ -24,14 +24,8 @@ jobs:
         run: pylint --fail-under=5.0 my_dl_framework
       - name: Test with pytest
         run: |
-          pytest --cov-report xml --cov=my_dl_framework tests/
-  sonarcloud:
-    name: SonarCloud
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-        with:
-          fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
+          pytest --durations=0 --cov=. --cov-report xml:coverage.xml --junitxml=results.xml --verbose tests/
+
       - name: SonarCloud Scan
         uses: SonarSource/sonarcloud-github-action@master
         env:
