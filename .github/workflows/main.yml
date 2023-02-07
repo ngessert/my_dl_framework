@@ -24,7 +24,7 @@ jobs:
         run: pylint --fail-under=5.0 my_dl_framework
       - name: Test with pytest
         run: |
-          pytest --durations=0 --cov=my_dl_framework --cov-report xml:coverage.xml --junitxml=results.xml --verbose tests/
+          pytest --durations=0 --cov=. --cov-report xml:coverage.xml --junitxml=results.xml --verbose tests/
 
       - name: SonarCloud Scan
         uses: SonarSource/sonarcloud-github-action@master
