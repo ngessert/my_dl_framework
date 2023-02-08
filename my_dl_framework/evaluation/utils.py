@@ -1,12 +1,19 @@
+import os
+import shutil
+
 import torch
 import numpy as np
 from typing import Dict, List, Tuple
+
+from clearml import Task
 from torch.utils.data import DataLoader
 import torch.nn.functional as F
 from tqdm import tqdm
 from sklearn.metrics import confusion_matrix, f1_score, roc_curve, roc_auc_score, log_loss
 import plotly.graph_objects as go
 import plotly.figure_factory as ff
+
+import my_dl_framework.constants as mc
 
 
 def get_roc_curve(class_names: List[str], predictions: np.ndarray, targets: np.ndarray) -> Tuple[go.Figure, List]:
@@ -140,6 +147,29 @@ def calculate_metrics(predictions: np.ndarray,
     return metrics, plots
 
 
+def aggregate_pred_and_tar(config: Dict,
+                           all_predictions: Dict,
+                           all_targets: Dict,
+                           class_names: List[str]) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Helper function to aggregate predictions and targets into arrays
+    :param config:              Dict with config
+    :param all_predictions:     Dict of predictions
+    :param all_targets:         Dict of targets
+    :param class_names:         List of class names
+    :return:
+    """
+    all_predictions_arr = np.zeros([len(all_predictions), len(class_names)])
+    all_targets_arr = np.zeros([len(all_predictions)], dtype=np.int32)
+    for idx, key in enumerate(all_predictions):
+        if config["test_aug_ensemble_mode"] == "mean":
+            all_predictions_arr[idx, :] = np.mean(np.array(all_predictions[key]), axis=0)
+        else:
+            all_predictions_arr[idx, :] = all_predictions_arr[key][0]
+        all_targets_arr[idx] = all_targets[key][0]
+    return all_predictions_arr, all_targets_arr
+
+
 def validate_model_classification(model: torch.nn.Module,
                                   dataloader: DataLoader,
                                   config: Dict,
@@ -151,6 +181,7 @@ def validate_model_classification(model: torch.nn.Module,
     :param dataloader:      Dataloader
     :param config:          Dict with config
     :param max_num_batches: Maximum number of batches to use
+    :param use_cleaml:      Whether clearml is used
     :return:                Metrics, plots, predictions, targets
     """
     model.eval()
@@ -175,13 +206,89 @@ def validate_model_classification(model: torch.nn.Module,
             all_predictions[idx].append(prediction)
             all_targets[idx].append(target)
     # Put into proper arrays
-    all_predictions_arr = np.zeros([len(all_predictions), len(class_names)])
-    all_targets_arr = np.zeros([len(all_predictions)], dtype=np.int32)
-    for idx, key in enumerate(all_predictions):
-        if config["test_aug_ensemble_mode"] == "mean":
-            all_predictions_arr[idx, :] = np.mean(np.array(all_predictions[key]), axis=0)
-        else:
-            all_predictions_arr[idx, :] = all_predictions_arr[key][0]
-        all_targets_arr[idx] = all_targets[key][0]
+    all_predictions_arr, all_targets_arr = aggregate_pred_and_tar(config, all_predictions, all_targets, class_names)
     metrics, plots = calculate_metrics(all_predictions_arr, all_targets_arr, class_names)
     return metrics, plots, all_predictions_arr, all_targets_arr
+
+
+def check_if_artifacts_exist(prev_task: Task, config: Dict, clearml_id: str):
+    """
+    Check if the required artifacts are there
+    :param prev_task:       ClearML task to get artifacts from
+    :param config:          Config dict
+    :param clearml_id:      ClearML id of task
+    :return:
+    """
+    # Check if required artifact exists
+    if "pred arr _CV_avg" not in prev_task.artifacts and config["ensemble_type"] == "predict":
+        raise ValueError(f"ClearML task {clearml_id} does not have a prediction-style predictions file. Did you "
+                         f"specify a successful evaluation task?")
+    if "tar arr _CV_avg" not in prev_task.artifacts and config["ensemble_type"] == "predict":
+        raise ValueError(f"ClearML task {clearml_id} does not have a prediction-style targets file. Did you "
+                         f"specify a successful evaluation task?")
+    if "pred arr _CV_cat" not in prev_task.artifacts and config["ensemble_type"] == "eval":
+        raise ValueError(f"ClearML task {clearml_id} does not have a CV-eval-style predictions file. Did you "
+                         f"specify a successful evaluation task?")
+    if "tar arr _CV_cat" not in prev_task.artifacts and config["ensemble_type"] == "eval":
+        raise ValueError(f"ClearML task {clearml_id} does not have a CV-eval-style targets file. Did you specify "
+                         f"a successful evaluation task?")
+    if "training_config" not in prev_task.artifacts:
+        raise ValueError(f"ClearML task {clearml_id} does not training config file. Did you specify "
+                         f"a successful evaluation task?")
+
+
+def add_experiments_from_clearml(config: Dict, all_eval_folders: List[str]) -> List[str]:
+    """
+    Get experiments from clearml
+    :param config:              Config dict
+    :param all_eval_folders:    List of folders with experiments
+    :return:
+    """
+    for clearml_id in config['clearml_ids']:
+        print(f"Retrieving artifacts from ClearML ID {clearml_id}")
+        prev_task = Task.get_task(task_id=clearml_id)
+        check_if_artifacts_exist(prev_task, config, clearml_id)
+        curr_folder = os.path.join(os.path.normpath(config['save_path']), clearml_id)
+        os.makedirs(curr_folder, exist_ok=True)
+        path_to_file = prev_task.artifacts["training_config"].get_local_copy()
+        shutil.copy(path_to_file, os.path.join(curr_folder, mc.TRAIN_CFG_NAME))
+        if config["ensemble_type"] == "eval":
+            if not os.path.exists(os.path.join(curr_folder, mc.PRED_FILE_NAME)):
+                path_to_file = prev_task.artifacts["pred arr _CV_cat"].get_local_copy()
+                shutil.copy(path_to_file, os.path.join(curr_folder, mc.PRED_FILE_NAME))
+            if not os.path.exists(os.path.join(curr_folder, mc.TAR_FILE_NAME)):
+                path_to_file = prev_task.artifacts["tar arr _CV_cat"].get_local_copy()
+                shutil.copy(path_to_file, os.path.join(curr_folder, mc.TAR_FILE_NAME))
+        elif config["ensemble_type"] == "predict":
+            if not os.path.exists(os.path.join(curr_folder, mc.PRED_FILE_NAME)):
+                path_to_file = prev_task.artifacts["pred arr _CV_avg"].get_local_copy()
+                shutil.copy(path_to_file, os.path.join(curr_folder, mc.PRED_FILE_NAME))
+            if not os.path.exists(os.path.join(curr_folder, mc.TAR_FILE_NAME)):
+                path_to_file = prev_task.artifacts["tar arr _CV_avg"].get_local_copy()
+                shutil.copy(path_to_file, os.path.join(curr_folder, mc.TAR_FILE_NAME))
+        # Add to normal folder list
+        all_eval_folders.append(curr_folder)
+    return all_eval_folders
+
+
+def gather_predictions(all_eval_folders: List[str]) -> Tuple[List, List, Dict]:
+    """
+    Gather predicitions from all folders in to lists
+    :param all_eval_folders:        List with folders
+    :return:
+    """
+    pred_list = list()
+    tar_list = list()
+    training_config = None
+    for curr_subfolder in all_eval_folders:
+        if not os.path.isfile(os.path.join(curr_subfolder, mc.PRED_FILE_NAME)):
+            raise ValueError(f"Could not find predictions_all.npy in folder {curr_subfolder}")
+        if not os.path.isfile(os.path.join(curr_subfolder, mc.TAR_FILE_NAME)):
+            raise ValueError(f"Could not find targets_all.npy in folder {curr_subfolder}")
+        if training_config is None and os.path.isfile(os.path.join(curr_subfolder, mc.TRAIN_CFG_NAME)):
+            with open(os.path.join(curr_subfolder, mc.TRAIN_CFG_NAME), encoding="utf-8") as file:
+                training_config = yaml.safe_load(file)
+        pred = np.load(os.path.join(curr_subfolder, mc.PRED_FILE_NAME))
+        pred_list.append(pred)
+        tar_list.append(np.load(os.path.join(curr_subfolder, mc.TAR_FILE_NAME)))
+    return pred_list, tar_list, training_config

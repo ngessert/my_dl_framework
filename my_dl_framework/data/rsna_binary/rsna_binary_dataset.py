@@ -46,31 +46,40 @@ class RSNAChallengeBinaryDataset(Dataset):
         if self.config['resize_images'] is not None:
             transform_list.append(transforms.Resize(self.config['resize_images']))
         if self.is_training:
-            if self.config['random_crop'] is not None:
-                transform_list.append(transforms.RandomCrop(self.config['random_crop']))
-            if self.config['random_fliplr']:
-                transform_list.append(transforms.RandomHorizontalFlip())
-            if self.config['random_flipud']:
-                transform_list.append(transforms.RandomVerticalFlip())
-            if self.config['color_jitter'] is not None:
-                transform_list.append(transforms.ColorJitter(
-                    brightness=self.config['color_jitter'][0],
-                    contrast=self.config['color_jitter'][1],
-                    saturation=self.config['color_jitter'][2],
-                    hue=self.config['color_jitter'][3]
-                ))
+            transform_list = self._add_train_transforms(transform_list)
         else:
-            if self.config['apply_center_crop_inf'] is not None and "multi_eq_crop" not in self.tta_options:
-                transform_list.append(transforms.CenterCrop(self.config['random_crop']))
-            if self.tta_options:
-                transform_list.append(AddBatchDim())
-            if "multi_eq_crop" in self.tta_options:
-                transform_list.append(MultiEqualCrop(num_per_axis=self.tta_options["multi_eq_crop"], crop_size=self.config["random_crop"]))
-            if "flip_horz" in self.tta_options:
-                transform_list.append(FlipTTA(flip_axis=3))
-            if "flip_vert" in self.tta_options:
-                transform_list.append(FlipTTA(flip_axis=2))
+            transform_list = self._add_inference_transforms(transform_list)
         self.all_transforms = transforms.Compose(transform_list)
+
+    def _add_train_transforms(self, transform_list: List) -> List:
+        if self.config['random_crop'] is not None:
+            transform_list.append(transforms.RandomCrop(self.config['random_crop']))
+        if self.config['random_fliplr']:
+            transform_list.append(transforms.RandomHorizontalFlip())
+        if self.config['random_flipud']:
+            transform_list.append(transforms.RandomVerticalFlip())
+        if self.config['color_jitter'] is not None:
+            transform_list.append(transforms.ColorJitter(
+                brightness=self.config['color_jitter'][0],
+                contrast=self.config['color_jitter'][1],
+                saturation=self.config['color_jitter'][2],
+                hue=self.config['color_jitter'][3]
+            ))
+        return transform_list
+
+    def _add_inference_transforms(self, transform_list: List) -> List:
+        if self.config['apply_center_crop_inf'] is not None and "multi_eq_crop" not in self.tta_options:
+            transform_list.append(transforms.CenterCrop(self.config['random_crop']))
+        if self.tta_options:
+            transform_list.append(AddBatchDim())
+        if "multi_eq_crop" in self.tta_options:
+            transform_list.append(
+                MultiEqualCrop(num_per_axis=self.tta_options["multi_eq_crop"], crop_size=self.config["random_crop"]))
+        if "flip_horz" in self.tta_options:
+            transform_list.append(FlipTTA(flip_axis=3))
+        if "flip_vert" in self.tta_options:
+            transform_list.append(FlipTTA(flip_axis=2))
+        return transform_list
 
     def __len__(self):
         """
