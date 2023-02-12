@@ -11,7 +11,7 @@ import os
 import numpy as np
 from glob import glob
 from torch.utils.data import DataLoader
-from typing import Optional, Dict, List
+from typing import Optional, Dict, List, Tuple
 
 from my_dl_framework.data.get_dataset import get_dataset
 from my_dl_framework.data.utils import collate_aug_batch
@@ -47,46 +47,55 @@ def define_tta_options(tta_flip_horz: bool,
     if tta_multi_eq_crop > 0:
         tta_options["multi_eq_crop"] = tta_multi_eq_crop
         batch_size_factor *= tta_multi_eq_crop
-    return tta_options, batch_size_factor
+    if tta_options:
+        collate_fn = collate_aug_batch
+    else:
+        collate_fn = None
+    return tta_options, batch_size_factor, collate_fn
 
 
-def get_artifacts_from_clearml(folder: str, clearml_id: str):
+def setup_folders_and_clearml(folder: str, clearml_id: str):
     """
     Download artifacts and put them in the right folder
     :param folder:
     :param clearml_id:
     :return:
     """
-    print(f"Retrieving artifacts from ClearML ID {clearml_id}")
-    prev_task = Task.get_task(task_id=clearml_id)
-    os.makedirs(folder, exist_ok=True)
-    # Checkpoints per CV file
-    cv_idx = 1
-    fold_exists = True
-    while fold_exists:
-        artifact_str = f"model-CV{cv_idx}-latest"
-        if os.path.isfile(os.path.join(folder, f"CV_{cv_idx}", mc.CKPT_NAME)):
-            cv_idx += 1
-            continue
+    if clearml_id is not None:
+        print(f"Retrieving artifacts from ClearML ID {clearml_id}")
+        prev_task = Task.get_task(task_id=clearml_id)
+        os.makedirs(folder, exist_ok=True)
+        # Checkpoints per CV file
+        cv_idx = 1
+        fold_exists = True
+        while fold_exists:
+            artifact_str = f"model-CV{cv_idx}-latest"
+            if os.path.isfile(os.path.join(folder, f"CV_{cv_idx}", mc.CKPT_NAME)):
+                cv_idx += 1
+                continue
+            if artifact_str in prev_task.artifacts:
+                print(f"Found ckpt for fold {cv_idx}, downloading...")
+                path_to_file = prev_task.artifacts[artifact_str].get_local_copy()
+                os.makedirs(os.path.join(folder, f"CV_{cv_idx}"), exist_ok=True)
+                shutil.copy(path_to_file, os.path.join(folder, f"CV_{cv_idx}", mc.CKPT_NAME))
+                cv_idx += 1
+            else:
+                fold_exists = False
+        # Config
+        config_dict = prev_task.get_parameters_as_dict()
+        config_dict = {key: parse_str(val) for key, val in config_dict["General"].items()}
+        with open(os.path.join(folder, mc.CFG_NAME), "w", encoding="utf-8") as file:
+            yaml.safe_dump(config_dict, file)
+        # CV split file
+        artifact_str = f"cv_split_file"
         if artifact_str in prev_task.artifacts:
-            print(f"Found ckpt for fold {cv_idx}, downloading...")
+            print(f"CV split file found, downloading...")
             path_to_file = prev_task.artifacts[artifact_str].get_local_copy()
-            os.makedirs(os.path.join(folder, f"CV_{cv_idx}"), exist_ok=True)
-            shutil.copy(path_to_file, os.path.join(folder, f"CV_{cv_idx}", mc.CKPT_NAME))
-            cv_idx += 1
-        else:
-            fold_exists = False
-    # Config
-    config_dict = prev_task.get_parameters_as_dict()
-    config_dict = {key: parse_str(val) for key, val in config_dict["General"].items()}
-    with open(os.path.join(folder, mc.CFG_NAME), "w", encoding="utf-8") as file:
-        yaml.safe_dump(config_dict, file)
-    # CV split file
-    artifact_str = f"cv_split_file"
-    if artifact_str in prev_task.artifacts:
-        print(f"CV split file found, downloading...")
-        path_to_file = prev_task.artifacts[artifact_str].get_local_copy()
-        shutil.copy(path_to_file, os.path.join(folder, "cv_split_file.json"))
+            shutil.copy(path_to_file, os.path.join(folder, "cv_split_file.json"))
+    elif folder is None or not os.path.exists(folder):
+        raise ValueError(f"Provided subfolder does not exist. ({folder})")
+    if not os.path.isfile(os.path.join(folder, mc.CFG_NAME)):
+        raise ValueError(f"No config.yaml found in folder {folder}.")
 
 
 def get_data_split(cv_eval: bool, folder: str) -> Dict:
@@ -154,40 +163,41 @@ def aggregate_eval_results(cv_eval: bool,
     Aggregate collected CV results, evaluate again, and upload to ClearML
     :return:
     """
-    # Aggregate CV predictions: concat for CV mode, average/vote for prediction mode
-    pred_train_val_all = None
-    tar_train_val_all = None
-    pred_list = np.array(pred_list)
-    tar_list = np.array(tar_list)
-    if cv_eval:
-        prefix = "_CV_cat"
-        pred_all = np.concatenate(pred_list, axis=0).reshape([-1, pred_list[0].shape[-1]])
-        tar_all = np.concatenate(tar_list, axis=0).reshape([-1])
+    if model is not None:
+        # Aggregate CV predictions: concat for CV mode, average/vote for prediction mode
+        pred_train_val_all = None
+        tar_train_val_all = None
+        pred_list = np.array(pred_list)
+        tar_list = np.array(tar_list)
+        if cv_eval:
+            prefix = "_CV_cat"
+            pred_all = np.concatenate(pred_list, axis=0).reshape([-1, pred_list[0].shape[-1]])
+            tar_all = np.concatenate(tar_list, axis=0).reshape([-1])
+        else:
+            prefix = "_CV_avg"
+            pred_all = np.squeeze(np.mean(pred_list, axis=0, keepdims=False), axis=0)
+            tar_all = np.squeeze(np.mean(tar_list, axis=0, keepdims=False), axis=0)
         if eval_on_train:
             pred_train_val_all = np.concatenate(pred_train_val_list, axis=0).reshape(
                 [-1, pred_train_val_list[0].shape[-1]])
             tar_train_val_all = np.concatenate(tar_train_val_list, axis=0).reshape([-1])
-    else:
-        prefix = "_CV_avg"
-        pred_all = np.squeeze(np.mean(pred_list, axis=0, keepdims=False), axis=0)
-        tar_all = np.squeeze(np.mean(tar_list, axis=0, keepdims=False), axis=0)
-    np.save(os.path.join(curr_pred_folder, "predictions_all.npy"), pred_all)
-    np.save(os.path.join(curr_pred_folder, "targets_all.npy"), tar_all)
-    if eval_on_train:
-        np.save(os.path.join(curr_pred_folder, "predictions_train_val_all.npy"), pred_train_val_all)
-        np.save(os.path.join(curr_pred_folder, "targets_train_val_all.npy"), tar_train_val_all)
-    if clearml:
-        # Store intermediate preds from CV
-        task.upload_artifact(f"pred arr {prefix}", os.path.join(curr_pred_folder, "predictions_all.npy"))
-        task.upload_artifact(f"tar arr {prefix}", os.path.join(curr_pred_folder, "targets_all.npy"))
-    # Perform evaluation through last model
-    if cv_eval or label_csv_path is not None:
-        model.calc_and_log_metrics(loggers=loggers,
-                                   predictions=pred_all,
-                                   targets=tar_all,
-                                   eval_name="validation",
-                                   prefix=prefix,
-                                   step=0)
+        np.save(os.path.join(curr_pred_folder, "predictions_all.npy"), pred_all)
+        np.save(os.path.join(curr_pred_folder, "targets_all.npy"), tar_all)
+        if eval_on_train:
+            np.save(os.path.join(curr_pred_folder, "predictions_train_val_all.npy"), pred_train_val_all)
+            np.save(os.path.join(curr_pred_folder, "targets_train_val_all.npy"), tar_train_val_all)
+        if clearml:
+            # Store intermediate preds from CV
+            task.upload_artifact(f"pred arr {prefix}", os.path.join(curr_pred_folder, "predictions_all.npy"))
+            task.upload_artifact(f"tar arr {prefix}", os.path.join(curr_pred_folder, "targets_all.npy"))
+        # Perform evaluation through last model
+        if cv_eval or label_csv_path is not None:
+            model.calc_and_log_metrics(loggers=loggers,
+                                       predictions=pred_all,
+                                       targets=tar_all,
+                                       eval_name="validation",
+                                       prefix=prefix,
+                                       step=0)
         if pred_train_val_all is not None:
             model.calc_and_log_metrics(loggers=loggers,
                                        predictions=pred_train_val_all,
@@ -215,7 +225,59 @@ def setup_clearml(clearml: bool, remote: bool, tags: List, arg_dict: Dict, folde
                              )
         task.connect(arg_dict)
         task.add_tags(tags)
+        # Upload config for potential later use
+        task.upload_artifact(name="training_config", artifact_object=os.path.join(folder, mc.CFG_NAME))
     return task
+
+
+def run_checks(curr_subfolder_cv: str, data_split: Dict, label_csv_path: str, cv_eval: bool, image_path: str,
+               config: Dict, cv_idx: int) -> Tuple[bool, str, List, List]:
+    """
+    Run some checks
+    :return:
+    """
+    continue_loop = False
+    if not os.path.isdir(curr_subfolder_cv):
+        continue_loop = True
+
+    if not os.path.exists(os.path.join(curr_subfolder_cv, mc.CKPT_NAME)):
+        print(f"No checkpoint found for fold {cv_idx + 1}, continue...")
+        continue_loop = True
+    print(f'Starting fold number {cv_idx + 1}')
+    if data_split is not None:
+        subset_train = data_split["training_splits"][cv_idx]
+        subset_val = data_split["validation_splits"][cv_idx]
+    else:
+        subset_train = list()
+        subset_val = [file_path.split(os.sep)[-1].split(".")[0] for file_path in glob(image_path + "/*")]
+    # Data
+    if label_csv_path is not None:
+        path_to_label_csv = label_csv_path
+    elif cv_eval:
+        path_to_label_csv = os.path.join(image_path.replace(image_path.split(os.sep)[-1], ""),
+                                         config['csv_name'])
+    else:
+        path_to_label_csv = None
+    return continue_loop, path_to_label_csv, subset_val, subset_train
+
+
+def setup_loggers(task: Task, curr_subfolder_cv_pred: str, cv_idx: int, dont_log_splits: bool, cv_eval: bool, label_csv_path: str) -> Tuple[List, List]:
+    """
+    Setup loggers for clearml and csv logging
+    """
+    csv_logger = pl.loggers.CSVLogger(curr_subfolder_cv_pred, name="eval_local_logs")
+    if task is not None:
+        pl_clearml_logger = PLClearML(task=task, name_base="CV" + str(cv_idx + 1), title_prefix=mc.CV_PREFIX)
+    else:
+        pl_clearml_logger = None
+    loggers = [csv_logger]
+    if pl_clearml_logger is not None:
+        loggers.append(pl_clearml_logger)
+    if dont_log_splits or (not cv_eval and label_csv_path is None):
+        curr_loggers = list()
+    else:
+        curr_loggers = loggers
+    return loggers, curr_loggers
 
 
 def run_prediction(folder: str,
@@ -232,15 +294,10 @@ def run_prediction(folder: str,
                    tta_flip_vert: bool,
                    tta_multi_eq_crop: int):
 
-    tta_options, batch_size_factor = define_tta_options(tta_flip_horz, tta_flip_vert, tta_multi_eq_crop)
+    tta_options, batch_size_factor, collate_fn = define_tta_options(tta_flip_horz, tta_flip_vert, tta_multi_eq_crop)
 
     image_path = os.path.normpath(image_path)
-    if clearml_id is not None:
-        get_artifacts_from_clearml(folder, clearml_id)
-    elif folder is None or not os.path.exists(folder):
-        raise ValueError(f"Provided subfolder does not exist. ({folder})")
-    if not os.path.isfile(os.path.join(folder, mc.CFG_NAME)):
-        raise ValueError(f"No config.yaml found in folder {folder}.")
+    setup_folders_and_clearml(folder, clearml_id)
     # Import config
     with open(os.path.join(folder, mc.CFG_NAME), encoding="utf-8") as file:
         config = yaml.safe_load(file)
@@ -253,9 +310,6 @@ def run_prediction(folder: str,
                 "cv_eval": cv_eval, "image_path": image_path, "limit_batches": limit_batches,
                 "dont_log_splits": dont_log_splits}
     task = setup_clearml(clearml, remote, tags, arg_dict, folder)
-    # Upload config for potential later use
-    if clearml:
-        task.upload_artifact(name="training_config", artifact_object=os.path.join(folder, mc.CFG_NAME))
     # for storing predictions, there may be many evaluations
     curr_pred_folder = os.path.join(folder, "pred_and_eval_" + datetime.now().strftime("%d-%m-%Y-%H-%M-%S"))
     os.makedirs(curr_pred_folder, exist_ok=True)
@@ -268,27 +322,12 @@ def run_prediction(folder: str,
     model = None
     loggers = list()
     for curr_subfolder_cv in glob(os.path.join(folder, "CV_*")):
-        if not os.path.isdir(curr_subfolder_cv):
-            continue
         cv_idx = int(curr_subfolder_cv.split("CV_")[-1]) - 1
-        if not os.path.exists(os.path.join(curr_subfolder_cv, mc.CKPT_NAME)):
-            print(f"No checkpoint found for fold {cv_idx+1}, continue...")
+        continue_loop, path_to_label_csv, subset_val, subset_train = run_checks(curr_subfolder_cv, data_split,
+                                                                                label_csv_path, cv_eval, image_path,
+                                                                                config, cv_idx)
+        if continue_loop:
             continue
-        print(f'Starting fold number {cv_idx+1}')
-        if data_split is not None:
-            subset_train = data_split["training_splits"][cv_idx]
-            subset_val = data_split["validation_splits"][cv_idx]
-        else:
-            subset_train = list()
-            subset_val = [file_path.split(os.sep)[-1].split(".")[0] for file_path in glob(image_path + "/*")]
-        # Data
-        if label_csv_path is not None:
-            path_to_label_csv = label_csv_path
-        elif cv_eval:
-            path_to_label_csv = os.path.join(image_path.replace(image_path.split(os.sep)[-1], ""),
-                                                                 config['csv_name'])
-        else:
-            path_to_label_csv = None
         dataset_val = get_dataset(config=config,
                                   image_dir=image_path,
                                   path_to_label_csv=path_to_label_csv,
@@ -300,7 +339,8 @@ def run_prediction(folder: str,
         if batch_size_adj <= 0:
             batch_size_adj = 1
         dataloader_val = DataLoader(dataset=dataset_val, batch_size=batch_size_adj, shuffle=False,
-                                    num_workers=8, pin_memory=True, collate_fn=collate_aug_batch if tta_options else None)
+                                    num_workers=8, pin_memory=True, collate_fn=collate_fn)
+        dataloader_train_val = None
         if eval_on_train and cv_eval:
             dataset_train_val = get_dataset(config=config,
                                             image_dir=image_path,
@@ -310,27 +350,14 @@ def run_prediction(folder: str,
                                             is_training=False)
             print(f'Size validation dataset {len(dataset_train_val)}')
             dataloader_train_val = DataLoader(dataset=dataset_train_val, batch_size=batch_size_adj, shuffle=False,
-                                              num_workers=8, pin_memory=True, collate_fn=collate_aug_batch if tta_options else None)
-        else:
-            dataloader_train_val = None
+                                              num_workers=8, pin_memory=True, collate_fn=collate_fn)
         model = PLClassificationWrapper(config=config,
                                         training_set_len=len(dataset_val),
-                                        prefix=CV_PREFIX + str(cv_idx+1))
+                                        prefix=mc.CV_PREFIX + str(cv_idx+1))
         # grab from model and save
         curr_subfolder_cv_pred = os.path.join(curr_pred_folder, "CV_" + str(cv_idx + 1))
         # we also want local logs
-        csv_logger = pl.loggers.CSVLogger(curr_subfolder_cv_pred, name="eval_local_logs")
-        if task is not None:
-            pl_clearml_logger = PLClearML(task=task, name_base="CV" + str(cv_idx+1), title_prefix=CV_PREFIX)
-        else:
-            pl_clearml_logger = None
-        loggers = [csv_logger]
-        if pl_clearml_logger is not None:
-            loggers.append(pl_clearml_logger)
-        if dont_log_splits or (not cv_eval and label_csv_path is None):
-            curr_loggers = list()
-        else:
-            curr_loggers = loggers
+        loggers, curr_loggers = setup_loggers(task, curr_subfolder_cv_pred, cv_idx, dont_log_splits, cv_eval, label_csv_path)
         pl.seed_everything(42, workers=True)
         trainer = pl.Trainer(devices=1,
                              default_root_dir=curr_subfolder_cv,
@@ -352,6 +379,7 @@ def run_prediction(folder: str,
         # To be safe, store a copy
         pred_list.append(model.predictions[None, :, :].copy())
         tar_list.append(model.targets[None, :].copy())
+
         if dataloader_train_val is not None:
             # Force train val eval setting
             model.is_trainval = True
@@ -364,14 +392,9 @@ def run_prediction(folder: str,
             tar_train_val_list.append(model.targets[None, :].copy())
             # Reset for next loop
             model.is_trainval = False
-        if clearml and not dont_log_splits:
-            # Store intermediate preds from CV
-            task.upload_artifact(f"pred arr CV{cv_idx+1}", os.path.join(curr_subfolder_cv_pred, "predictions_train_val.npy"))
-            task.upload_artifact(f"tar arr CV{cv_idx+1}", os.path.join(curr_subfolder_cv_pred, "targets_train_val.npy"))
     # Aggregate, if at least one split was present
-    if model is not None:
-        aggregate_eval_results(cv_eval, eval_on_train, pred_list, tar_list, pred_train_val_list, tar_train_val_list,
-                               curr_pred_folder, model, label_csv_path, loggers, clearml, task)
+    aggregate_eval_results(cv_eval, eval_on_train, pred_list, tar_list, pred_train_val_list, tar_train_val_list,
+                           curr_pred_folder, model, label_csv_path, loggers, clearml, task)
 
 
 if __name__ == "__main__":
