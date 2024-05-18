@@ -9,6 +9,7 @@ import os
 import shutil
 from datetime import datetime
 import yaml
+from clearml.config import running_remotely
 from torch.utils.data import DataLoader
 
 from clearml import Task
@@ -19,21 +20,20 @@ from my_dl_framework.data.get_dataset import get_dataset
 from my_dl_framework.models.pl_class_wrapper import PLClassificationWrapper
 from my_dl_framework.utils.pytorch_lightning.clearml_logger import PLClearML
 from my_dl_framework.utils.pytorch_lightning.minibatch_plot_callback import MBPlotCallback
+import my_dl_framework.constants as mc
 
 
 def run_training(config_path: str,
                  clearml: bool,
                  num_gpus: Union[int, None],
                  multi_gpu_strat: Union[str, None],
-                 remote: bool,
-                 fast_dev_run: bool):
+                 fast_dev_run: int):
     """
     Run pytorch lightning training
     :param config_path:              Path to config file
     :param clearml:             Whther to use clearml
     :param num_gpus:            Number of GPUs to use
     :param multi_gpu_strat:     Pytorch lightning GPU strat (e.g. dpp)
-    :param remote:              Whether job is being executed remotely (auto-set by clearml)
     :param fast_dev_run:        Pytorch lighning dev-run option
     :return:
     """
@@ -47,8 +47,8 @@ def run_training(config_path: str,
     task = None
     task_prev = None
     if clearml:
-        if remote:
-            task = Task.get_task(project_name="RSNABinary", task_name=config_path.split(os.sep)[-1])  # ?
+        if running_remotely():
+            task = Task.init()
         else:
             task = Task.init(project_name='RSNABinary',
                              task_name=config_path.split(os.sep)[-1],
@@ -58,7 +58,7 @@ def run_training(config_path: str,
             if config["continue_training_from_clearml"] is not None:
                 task_prev = Task.get_task(task_id=config["continue_training_from_clearml"])
                 print(f'Use ckpts from task {config["continue_training_from_clearml"]}')
-        task.connect(config)
+        config = task.connect(config)
         task.add_tags(config["clearml_tags"])
     # Run Training
     # Setup CV
@@ -164,11 +164,11 @@ def run_training(config_path: str,
                              log_every_n_steps=config["loss_log_freq"]
                              )
         # Load checkpoint if training is continued and ckpt exists
-        if config["continue_training"] is not None and os.path.isfile(os.path.join(curr_subfolder_cv, "last.ckpt")):
-            ckpt_path = os.path.join(curr_subfolder_cv, "last.ckpt")
+        if config["continue_training"] is not None and os.path.isfile(os.path.join(curr_subfolder_cv, mc.CKPT_NAME)):
+            ckpt_path = os.path.join(curr_subfolder_cv, mc.CKPT_NAME)
         elif task_prev is not None:
             print("No local ckpt found, getting ckpt from ClearML")
-            ckpt_path = os.path.join(curr_subfolder_cv, "last.ckpt")
+            ckpt_path = os.path.join(curr_subfolder_cv, mc.CKPT_NAME)
             ckpt_path_tmp = task_prev.artifacts[f"model-CV{cv_idx+1}-latest"].get_local_copy()
             shutil.copy(ckpt_path_tmp, ckpt_path)
         else:
@@ -186,7 +186,6 @@ if __name__ == "__main__":
     argparser.add_argument('-cl', '--clearml', action="store_true", help='Whether to use clearml', required=False)
     argparser.add_argument('-ng', '--num_gpus', type=int, default=None, help="Number of GPUs to use")
     argparser.add_argument('-st', '--multi_gpu_strat', type=str, default=None, help="MultiGPU strat, e.g. ddp")
-    argparser.add_argument('-r', '--remote', action="store_true", help='Whether remote execution is done remote', required=False)
     argparser.add_argument('-fd', '--fast_dev_run', type=int, default=None, help="test only x batches")
     args = argparser.parse_args()
     print(f'Args: {args}')
@@ -194,5 +193,4 @@ if __name__ == "__main__":
                  clearml=args.clearml,
                  num_gpus=args.num_gpus,
                  multi_gpu_strat=args.multi_gpu_strat,
-                 remote=args.remote,
                  fast_dev_run=args.fast_dev_run)

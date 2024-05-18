@@ -25,7 +25,6 @@ import my_dl_framework.constants as mc
 def run_prediction(folder: str,
                    clearml_id: Optional[str],
                    clearml: bool,
-                   remote: bool,
                    eval_on_train: bool,
                    cv_eval: bool,
                    image_path: str,
@@ -51,7 +50,7 @@ def run_prediction(folder: str,
     arg_dict = {"folder": folder, "clearml_id": clearml_id, "eval_on_train": eval_on_train,
                 "cv_eval": cv_eval, "image_path": image_path, "limit_batches": limit_batches,
                 "dont_log_splits": dont_log_splits}
-    task = setup_clearml(clearml, remote, tags, arg_dict, folder)
+    task = setup_clearml(clearml, tags, arg_dict, folder)
     # for storing predictions, there may be many evaluations
     curr_pred_folder = os.path.join(folder, "pred_and_eval_" + datetime.now().strftime("%d-%m-%Y-%H-%M-%S"))
     os.makedirs(curr_pred_folder, exist_ok=True)
@@ -64,6 +63,8 @@ def run_prediction(folder: str,
     model = None
     loggers = list()
     for curr_subfolder_cv in glob(os.path.join(folder, "CV_*")):
+        if os.path.isfile(curr_subfolder_cv):
+            continue
         cv_idx = int(curr_subfolder_cv.split("CV_")[-1]) - 1
         continue_loop, path_to_label_csv, subset_val, subset_train = run_checks(curr_subfolder_cv, data_split,
                                                                                 label_csv_path, cv_eval, image_path,
@@ -144,7 +145,6 @@ if __name__ == "__main__":
     argparser.add_argument('-f', '--folder', type=str, help='Folder path', required=False)
     argparser.add_argument('-cid', '--clearml_id', type=str, help='ClearML ID of experiment', required=False)
     argparser.add_argument('-cl', '--clearml', action="store_true", help='Whether to use clearml for logging results', required=False)
-    argparser.add_argument('-r', '--remote', action="store_true", help='Whether remote execution is done', required=False)
     argparser.add_argument('-dls', '--dont_log_splits', action="store_true", help='Whether inidivudal CV splits should be logged or just the cat/avg', required=False)
     argparser.add_argument('-etr', '--eval_on_train', action="store_true", help='Whether to evaluate on the training set (when doing CV evaluation)', required=False)
     argparser.add_argument('-cv', '--cv_eval', action="store_true", help='Whether the CV split file should be used for evaluation', required=False)
@@ -160,7 +160,6 @@ if __name__ == "__main__":
     run_prediction(folder=args.folder,
                    clearml_id=args.clearml_id,
                    clearml=args.clearml,
-                   remote=args.remote,
                    eval_on_train=args.eval_on_train,
                    cv_eval=args.cv_eval,
                    image_path=args.image_path,

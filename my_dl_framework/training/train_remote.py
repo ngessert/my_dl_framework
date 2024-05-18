@@ -17,7 +17,6 @@ def train_remote(cmd_args):
     """
     # Add arguments
     cmd_args["clearml"] = True
-    cmd_args["remote"] = True
     # Define tas
     task = Task.create(project_name='RSNABinary',
                        task_name=cmd_args.config.split(os.sep)[-1],

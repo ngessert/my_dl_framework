@@ -11,7 +11,6 @@ def test_train_script():
                  clearml=False,
                  num_gpus=None,
                  multi_gpu_strat=None,
-                 remote=False,
                  fast_dev_run=False)
     found_experiment = False
     for folder in glob(os.path.join("tests", "test_data", "rsna_binary", "experiments", "*")):

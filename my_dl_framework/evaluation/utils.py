@@ -9,6 +9,7 @@ from typing import Dict, List, Tuple
 
 import yaml
 from clearml import Task, TaskTypes
+from clearml.config import running_remotely
 from torch.utils.data import DataLoader
 import torch.nn.functional as F
 from tqdm import tqdm
@@ -483,15 +484,15 @@ def aggregate_eval_results(cv_eval: bool,
                                        step=0)
 
 
-def setup_clearml(clearml: bool, remote: bool, tags: List, arg_dict: Dict, folder: str):
+def setup_clearml(clearml: bool, tags: List, arg_dict: Dict, folder: str):
     """
     Setup clearml task
     :return:
     """
     task = None
     if clearml:
-        if remote:
-            task = Task.get_task(project_name="RSNABinary", task_name=folder.split(os.sep)[-1])  # ?
+        if running_remotely():
+            task = Task.init()
         else:
             task = Task.init(project_name='RSNABinary',
                              task_name=folder.split(os.sep)[-1],

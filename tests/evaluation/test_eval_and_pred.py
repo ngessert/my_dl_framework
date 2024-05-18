@@ -11,7 +11,6 @@ def test_eval_and_pred_script():
     run_prediction(folder=os.path.join("tests", "test_data", "rsna_binary", "exp_for_val"),
                    clearml_id=None,
                    clearml=False,
-                   remote=False,
                    eval_on_train=True,
                    cv_eval=True,
                    image_path=os.path.join("tests", "test_data", "rsna_binary", "images"),

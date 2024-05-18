@@ -15,3 +15,4 @@ pandas
 matplotlib
 pydicom
 lightning-lite==1.8.5
+typer
