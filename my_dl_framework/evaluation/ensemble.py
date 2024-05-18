@@ -8,17 +8,27 @@ from datetime import datetime
 import yaml
 import os
 import numpy as np
+from typing import Dict, List, Tuple
 
+from my_dl_framework.evaluation.utils import add_experiments_from_clearml, gather_predictions
 from my_dl_framework.models.pl_class_wrapper import PLClassificationWrapper
 import pytorch_lightning as pl
 from clearml import Task, TaskTypes
 
 from my_dl_framework.utils.pytorch_lightning.clearml_logger import PLClearML
+import my_dl_framework.constants as mc
 
 
 def run_ensemble(config_path: str,
                  clearml: bool,
                  remote: bool):
+    """
+    Main ensembling execution script
+    :param config_path:         Path to ensemble config
+    :param clearml:             Whether to use clearml
+    :param remote:              Whether this is a remote execution
+    :return:
+    """
     # Import config
     with open(config_path, encoding="utf-8") as file:
         config = yaml.safe_load(file)
@@ -29,45 +39,9 @@ def run_ensemble(config_path: str,
     os.makedirs(curr_ens_folder, exist_ok=True)
 
     all_eval_folders = config["eval_folders"] or list()
-    for clearml_id in config['clearml_ids']:
-        print(f"Retrieving artifacts from ClearML ID {clearml_id}")
-        prev_task = Task.get_task(task_id=clearml_id)
-        # Check if required artifact exists
-        if "pred arr _CV_avg" not in prev_task.artifacts and config["ensemble_type"] == "predict":
-            raise ValueError(f"ClearML task {clearml_id} does not have a prediction-style predictions file. Did you "
-                             f"specify a successful evaluation task?")
-        if "tar arr _CV_avg" not in prev_task.artifacts and config["ensemble_type"] == "predict":
-            raise ValueError(f"ClearML task {clearml_id} does not have a prediction-style targets file. Did you "
-                             f"specify a successful evaluation task?")
-        if "pred arr _CV_cat" not in prev_task.artifacts and config["ensemble_type"] == "eval":
-            raise ValueError(f"ClearML task {clearml_id} does not have a CV-eval-style predictions file. Did you "
-                             f"specify a successful evaluation task?")
-        if "tar arr _CV_cat" not in prev_task.artifacts and config["ensemble_type"] == "eval":
-            raise ValueError(f"ClearML task {clearml_id} does not have a CV-eval-style targets file. Did you specify "
-                             f"a successful evaluation task?")
-        if "training_config" not in prev_task.artifacts:
-            raise ValueError(f"ClearML task {clearml_id} does not training config file. Did you specify "
-                             f"a successful evaluation task?")
-        curr_folder = os.path.join(os.path.normpath(config['save_path']), clearml_id)
-        os.makedirs(curr_folder, exist_ok=True)
-        path_to_file = prev_task.artifacts["training_config"].get_local_copy()
-        shutil.copy(path_to_file, os.path.join(curr_folder, "training_config.yaml"))
-        if config["ensemble_type"] == "eval":
-            if not os.path.exists(os.path.join(curr_folder, "predictions_all.npy")):
-                path_to_file = prev_task.artifacts["pred arr _CV_cat"].get_local_copy()
-                shutil.copy(path_to_file, os.path.join(curr_folder, "predictions_all.npy"))
-            if not os.path.exists(os.path.join(curr_folder, "targets_all.npy")):
-                path_to_file = prev_task.artifacts["tar arr _CV_cat"].get_local_copy()
-                shutil.copy(path_to_file, os.path.join(curr_folder, "targets_all.npy"))
-        elif config["ensemble_type"] == "predict":
-            if not os.path.exists(os.path.join(curr_folder, "predictions_all.npy")):
-                path_to_file = prev_task.artifacts["pred arr _CV_avg"].get_local_copy()
-                shutil.copy(path_to_file, os.path.join(curr_folder, "predictions_all.npy"))
-            if not os.path.exists(os.path.join(curr_folder, "targets_all.npy")):
-                path_to_file = prev_task.artifacts["tar arr _CV_avg"].get_local_copy()
-                shutil.copy(path_to_file, os.path.join(curr_folder, "targets_all.npy"))
-        # Add to normal folder list
-        all_eval_folders.append(curr_folder)
+
+    all_eval_folders = add_experiments_from_clearml(config, all_eval_folders)
+
     # ClearML
     task = None
     if clearml:
@@ -82,20 +56,8 @@ def run_ensemble(config_path: str,
                              )
         task.connect(config)
         task.add_tags(config["clearml_tags"])
-    pred_list = list()
-    tar_list = list()
-    training_config = None
-    for curr_subfolder in all_eval_folders:
-        if not os.path.isfile(os.path.join(curr_subfolder, "predictions_all.npy")):
-            raise ValueError(f"Could not find predictions_all.npy in folder {curr_subfolder}")
-        if not os.path.isfile(os.path.join(curr_subfolder, "targets_all.npy")):
-            raise ValueError(f"Could not find targets_all.npy in folder {curr_subfolder}")
-        if training_config is None and os.path.isfile(os.path.join(curr_subfolder, "training_config.yaml")):
-            with open(os.path.join(curr_subfolder, "training_config.yaml"), encoding="utf-8") as file:
-                training_config = yaml.safe_load(file)
-        pred = np.load(os.path.join(curr_subfolder, "predictions_all.npy"))
-        pred_list.append(pred)
-        tar_list.append(np.load(os.path.join(curr_subfolder, "targets_all.npy")))
+
+    pred_list, tar_list, training_config = gather_predictions(all_eval_folders)
 
     if training_config is None:
         raise ValueError("No training config file available - something seems to be wrong with your selected evaluation runs.")
@@ -111,12 +73,12 @@ def run_ensemble(config_path: str,
         tar_all = np.mean(tar_list, axis=0, keepdims=False)
     else:
         raise ValueError(f"Unsupported ensemble combination type {config['comb_type']}")
-    np.save(os.path.join(curr_ens_folder, "predictions_all.npy"), pred_all)
-    np.save(os.path.join(curr_ens_folder, "targets_all.npy"), tar_all)
+    np.save(os.path.join(curr_ens_folder, mc.PRED_FILE_NAME), pred_all)
+    np.save(os.path.join(curr_ens_folder, mc.TAR_FILE_NAME), tar_all)
     if clearml:
         # Store intermediate preds from CV
-        task.upload_artifact(f"pred arr {config['comb_type']}", os.path.join(curr_ens_folder, "predictions_all.npy"))
-        task.upload_artifact(f"tar arr {config['comb_type']}", os.path.join(curr_ens_folder, "targets_all.npy"))
+        task.upload_artifact(f"pred arr {config['comb_type']}", os.path.join(curr_ens_folder, mc.PRED_FILE_NAME))
+        task.upload_artifact(f"tar arr {config['comb_type']}", os.path.join(curr_ens_folder, mc.TAR_FILE_NAME))
     # Perform evaluation through last model
     if config["ensemble_type"] == "eval":
         # we also want local logs

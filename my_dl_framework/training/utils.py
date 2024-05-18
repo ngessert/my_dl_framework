@@ -13,6 +13,7 @@ import plotly
 from clearml import Logger
 import matplotlib.pyplot as plt
 from my_dl_framework.evaluation.utils import validate_model_classification
+import my_dl_framework.constants as mc
 
 
 def get_tv_class_model(config: Dict) -> torch.nn.Module:
@@ -139,8 +140,8 @@ def get_and_log_metrics_classification(eval_name: str,
             if isinstance(plot, plotly.graph_objs.Figure):
                 logger.report_plotly(title=eval_name + " " + plot_name, series=eval_name + " " + plot_name, figure=plot, iteration=epoch)
     # Save metrics
-    if os.path.exists(os.path.join(curr_subfolder, eval_name + "_metrics.json")):
-        with open(os.path.join(curr_subfolder, eval_name + "_metrics.json"), encoding="utf-8") as file:
+    if os.path.exists(os.path.join(curr_subfolder, eval_name + mc.METRICS_FILE)):
+        with open(os.path.join(curr_subfolder, eval_name + mc.METRICS_FILE), encoding="utf-8") as file:
             metrics_all = json.load(file)
         for key in metrics_all:
             metrics_all[key] = np.asarray(metrics_all[key])
@@ -150,7 +151,7 @@ def get_and_log_metrics_classification(eval_name: str,
         metrics_all["best_epoch"] = epoch
         metrics_all[epoch] = metrics
     # Save
-    with open(os.path.join(curr_subfolder, eval_name + "_metrics.json"), encoding="utf-8") as file:
+    with open(os.path.join(curr_subfolder, eval_name + mc.METRICS_FILE), encoding="utf-8") as file:
         json.dump(metrics_all, file, cls=NumpyEncoder)
     return metrics_all, pred, tar
 

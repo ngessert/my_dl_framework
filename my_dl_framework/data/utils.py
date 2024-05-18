@@ -24,9 +24,6 @@ class ZeroOneNorm:
     0-1 norm for torch Tensors
     """
 
-    def __init__(self):
-        pass
-
     def __call__(self, image: torch.Tensor) -> torch.Tensor:
         min_val, _ = torch.min(image.flatten(), dim=0)
         max_val, _ = torch.max(image.flatten(), dim=0)
@@ -38,9 +35,6 @@ class AddBatchDim:
     """
     Add batch dim
     """
-
-    def __init__(self):
-        pass
 
     def __call__(self, image: torch.Tensor) -> torch.Tensor:
         return image.unsqueeze(0)
