@@ -11,3 +11,5 @@ TAR_FILE_NAME = "targets_all.npy"
 CKPT_NAME = "last.ckpt"
 
 CV_PREFIX = "_CV_"
+
+METRICS_FILE = "_metrics.json"

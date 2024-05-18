@@ -364,9 +364,9 @@ def setup_folders_and_clearml(folder: str, clearml_id: str):
         with open(os.path.join(folder, mc.CFG_NAME), "w", encoding="utf-8") as file:
             yaml.safe_dump(config_dict, file)
         # CV split file
-        artifact_str = f"cv_split_file"
+        artifact_str = "cv_split_file"
         if artifact_str in prev_task.artifacts:
-            print(f"CV split file found, downloading...")
+            print("CV split file found, downloading...")
             path_to_file = prev_task.artifacts[artifact_str].get_local_copy()
             shutil.copy(path_to_file, os.path.join(folder, "cv_split_file.json"))
     elif folder is None or not os.path.exists(folder):
@@ -492,7 +492,7 @@ def setup_clearml(clearml: bool, tags: List, arg_dict: Dict, folder: str):
     task = None
     if clearml:
         if running_remotely():
-            task = Task.init()
+            task = Task.current_task()
         else:
             task = Task.init(project_name='RSNABinary',
                              task_name=folder.split(os.sep)[-1],

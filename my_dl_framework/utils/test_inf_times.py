@@ -4,23 +4,23 @@ import torchvision
 import numpy as np
 
 if torch.cuda.is_available():
-    print('Cuda avilable',torch.cuda.get_device_name(0))
+    print('Cuda avilable', torch.cuda.get_device_name(0))
 else:
-    print('cuda is not avilable')
+    print('Cuda is not avilable')
 
 
 def tput(model, name):
     with torch.no_grad():
-        input = torch.rand(1, 3, 224, 224)
+        input_tensor = torch.rand(1, 3, 224, 224)
         if torch.cuda.is_available():
-            input = input.to('cuda')
+            input_tensor = input_tensor.to('cuda')
             model = model.to('cuda')
         model.eval()
-        model(input)
+        model(input_tensor)
         times = list()
         for _ in range(50):
             t1 = time.time()
-            model(input)
+            model(input_tensor)
             t2 = time.time()
             times.append(t2-t1)
     print(f"Model {name}: {np.mean(times[10:]) * 1000}")

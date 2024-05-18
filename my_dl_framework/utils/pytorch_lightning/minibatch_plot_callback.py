@@ -18,15 +18,13 @@ class MBPlotCallback(Callback):
 
     def on_train_batch_start(self, trainer: pl.Trainer, pl_module: pl.LightningModule, batch: Any, batch_idx: int) -> None:
         if not self.state["has_plotted"]:
-            indices, images, targets = batch
+            _, images, targets = batch
             plot_example_batch(images.detach().cpu(), targets.detach().cpu(), batch_idx, self.curr_subfolder_cv, self.config)
             self.state["has_plotted"] = True
 
-    def on_validation_batch_start(
-        self, trainer: pl.Trainer, pl_module: pl.LightningModule, batch: Any, batch_idx: int, dataloader_idx: int
-    ) -> None:
+    def on_validation_batch_start(self, trainer: pl.Trainer, pl_module: pl.LightningModule, batch: Any, batch_idx: int, dataloader_idx: int) -> None:
         if not self.state["has_plotted"]:
-            indices, images, targets = batch
+            _, images, targets = batch
             plot_example_batch(images.detach().cpu(), targets.detach().cpu(), batch_idx, self.curr_subfolder_cv, self.config)
             self.state["has_plotted"] = True
 

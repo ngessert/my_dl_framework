@@ -48,7 +48,7 @@ def run_training(config_path: str,
     task_prev = None
     if clearml:
         if running_remotely():
-            task = Task.init()
+            task = Task.current_task()
         else:
             task = Task.init(project_name='RSNABinary',
                              task_name=config_path.split(os.sep)[-1],
