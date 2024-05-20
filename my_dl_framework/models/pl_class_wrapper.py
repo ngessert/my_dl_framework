@@ -1,13 +1,14 @@
-from typing import Dict, Any, List, Optional
+from typing import (Any, Dict, List, Optional)
+
+import lightning.pytorch as pl
 import numpy as np
 import pandas as pd
 import torch
 from lightning.pytorch.loggers.logger import Logger
 from torch.nn import functional as F
-import lightning.pytorch as pl
 
 from my_dl_framework.evaluation.utils import calculate_metrics
-from my_dl_framework.models.utils import get_lossfunction, get_lr_scheduler, get_tv_class_model, get_optimizer
+from my_dl_framework.models.utils import (get_lossfunction, get_lr_scheduler, get_optimizer, get_tv_class_model)
 from my_dl_framework.utils.pytorch_lightning.clearml_logger import PLClearML
 
 
@@ -38,7 +39,7 @@ class PLClassificationWrapper(pl.LightningModule):
     """ Pytorch lightning wrapper for classification models
     """
 
-    def __init__(self, config: Dict, training_set_len: int = 0, is_trainval: bool = False, prefix: str = ""):
+    def __init__(self, config: Dict, training_set_len: int = 0, is_trainval: bool = False, prefix: str = ''):
         super().__init__()
         self.config = config
         self.model = get_tv_class_model(config=self.config)
@@ -60,19 +61,19 @@ class PLClassificationWrapper(pl.LightningModule):
     def configure_optimizers(self):
         optimizer = get_optimizer(self.config, self.model)
         lr_scheduler = get_lr_scheduler(self.config, optimizer)
-        return {"optimizer": optimizer, "lr_scheduler": lr_scheduler}
+        return {'optimizer': optimizer, 'lr_scheduler': lr_scheduler}
 
     def training_step(self, train_batch, batch_idx):
         _, images, targets = train_batch
         outputs = self.model(images)
         loss = self.loss_function(outputs, targets)
-        self.log("train_loss" + self.prefix, loss, on_step=False, on_epoch=True, prog_bar=True, logger=True)
-        return {"loss": loss, "batch_idx": batch_idx}
+        self.log('train_loss' + self.prefix, loss, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+        return {'loss': loss, 'batch_idx': batch_idx}
 
     def validation_step(self, val_batch, batch_idx, dataloader_idx=0):
         indices, images, targets = val_batch
         outputs = F.softmax(self.model(images), dim=1)
-        return_dict = {"outputs": outputs, "targets": targets, "indices": indices, "dataloader_idx": dataloader_idx}
+        return_dict = {'outputs': outputs, 'targets': targets, 'indices': indices, 'dataloader_idx': dataloader_idx}
         self.validation_step_outputs.append(return_dict)
         return return_dict
 
@@ -85,15 +86,15 @@ class PLClassificationWrapper(pl.LightningModule):
         step: int,
         loggers: Optional[List[Logger]] = None,
     ):
-        metrics, plots = calculate_metrics(predictions=predictions, targets=targets, class_names=self.config["data"]["class_names"])
-        for i in range(len(self.config["data"]["class_names"])):
-            log_dict = {key + "_" + self.config["data"]["class_names"][i] + "_" + eval_name + prefix: val[i] for key, val in metrics.items()}
+        metrics, plots = calculate_metrics(predictions=predictions, targets=targets, class_names=self.config['data']['class_names'])
+        for i in range(len(self.config['data']['class_names'])):
+            log_dict = {key + '_' + self.config['data']['class_names'][i] + '_' + eval_name + prefix: val[i] for key, val in metrics.items()}
             if loggers is None:
                 self.log_dict(log_dict, on_step=False, on_epoch=True)
             else:
                 for logger in loggers:
                     logger.log_metrics(log_dict, step=step)
-        log_dict = {key + "_mean_" + eval_name + prefix: val[-1] for key, val in metrics.items()}
+        log_dict = {key + '_mean_' + eval_name + prefix: val[-1] for key, val in metrics.items()}
         if loggers is None:
             self.log_dict(log_dict, on_step=False, on_epoch=True)
         else:
@@ -105,22 +106,22 @@ class PLClassificationWrapper(pl.LightningModule):
             if isinstance(logger, PLClearML):
                 logger.log_plotly(title=eval_name + prefix, plotly_obj_dict=plots, step=step)
                 metric_df = pd.DataFrame.from_dict(metrics)
-                metric_df["classes"] = self.config["data"]["class_names"] + ["Avg"]
-                metric_df.set_index("classes", inplace=True)
-                logger.log_table(title="Metrics " + eval_name + prefix, step=step, dataframe=metric_df)
+                metric_df['classes'] = self.config['data']['class_names'] + ['Avg']
+                metric_df.set_index('classes', inplace=True)
+                logger.log_table(title='Metrics ' + eval_name + prefix, step=step, dataframe=metric_df)
 
     def on_validation_epoch_end(self):
         # Assumes val loader is put first
         outputs = self.validation_step_outputs
-        eval_name = "validation" if outputs[0]["dataloader_idx"] == 0 or self.is_trainval else "train_val"
-        stacked_dict = stack_list_of_dicts(outputs, ["outputs", "targets", "indices"], to_numpy=True)
-        stacked_preds = stacked_dict["outputs"]
-        stacked_targets = stacked_dict["targets"]
-        stacked_indices = stacked_dict["indices"]
+        eval_name = 'validation' if outputs[0]['dataloader_idx'] == 0 or self.is_trainval else 'train_val'
+        stacked_dict = stack_list_of_dicts(outputs, ['outputs', 'targets', 'indices'], to_numpy=True)
+        stacked_preds = stacked_dict['outputs']
+        stacked_targets = stacked_dict['targets']
+        stacked_indices = stacked_dict['indices']
         predictions = list()
         targets = list()
         for idx in np.unique(stacked_indices):
-            if self.config["test_aug_ensemble_mode"] == "mean":
+            if self.config['test_aug_ensemble_mode'] == 'mean':
                 predictions.append(np.mean(stacked_preds[stacked_indices == idx], 0))
                 targets.append(np.mean(stacked_targets[stacked_indices == idx]))
             else:

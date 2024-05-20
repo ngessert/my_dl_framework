@@ -3,29 +3,28 @@ ClearML Logger
 -------------------------
 """
 import os
+import shutil
 from argparse import Namespace
 from pathlib import Path
-import shutil
-from typing import Any, Dict, Mapping, Optional, Union
+from typing import (Any, Dict, Mapping, Optional, Union)
+
 import pandas as pd
-
-from torch import Tensor
-
+from clearml import Task
+from lightning.fabric.utilities.logger import (_convert_params, _flatten_dict, _sanitize_callable_params)
 from lightning.pytorch.callbacks.model_checkpoint import ModelCheckpoint
 from lightning.pytorch.loggers.logger import Logger
-from lightning.fabric.utilities.logger import _convert_params, _flatten_dict, _sanitize_callable_params
 from lightning.pytorch.loggers.utilities import _scan_checkpoints
 from lightning.pytorch.utilities.rank_zero import rank_zero_only
-from clearml import Task
+from torch import Tensor
 
 
 class PLClearML(Logger):
     """ ClearML logger for pytorch lightning
     """
 
-    LOGGER_JOIN_CHAR = "-"
+    LOGGER_JOIN_CHAR = '-'
 
-    def __init__(self, task: Task, name_base: str, save_dir: str = ".", title_prefix: str = "", log_model: bool = True) -> None:
+    def __init__(self, task: Task, name_base: str, save_dir: str = '.', title_prefix: str = '', log_model: bool = True) -> None:
         super().__init__()
         self.task = task
         self.name_base = name_base
@@ -43,11 +42,11 @@ class PLClearML(Logger):
 
     @property
     def name(self) -> str:
-        return self.name_base + "_" + self.task.name
+        return self.name_base + '_' + self.task.name
 
     @property
     def version(self):
-        return "version_0"
+        return 'version_0'
 
     @rank_zero_only
     def log_hyperparams(self, params: Union[Dict[str, Any], Namespace]) -> None:
@@ -58,12 +57,12 @@ class PLClearML(Logger):
 
     @rank_zero_only
     def log_metrics(self, metrics: Mapping[str, float], step: Optional[int] = None) -> None:
-        assert rank_zero_only.rank == 0, "experiment tried to log from global_rank != 0"
+        assert rank_zero_only.rank == 0, 'experiment tried to log from global_rank != 0'
 
         if step is None:
             step = 0
         for metric in metrics:
-            self.logger.report_scalar(title=metric.split("_")[0], series=metric, value=metrics[metric], iteration=step)
+            self.logger.report_scalar(title=metric.split('_')[0], series=metric, value=metrics[metric], iteration=step)
 
     @rank_zero_only
     def log_table(
@@ -90,7 +89,7 @@ class PLClearML(Logger):
         if step is None:
             step = 0
         for plot_name, plot in plotly_obj_dict.items():
-            self.logger.report_plotly(title=plot_name + "_" + title, series=plot_name + "_" + title, figure=plot, iteration=step)
+            self.logger.report_plotly(title=plot_name + '_' + title, series=plot_name + '_' + title, figure=plot, iteration=step)
 
     @rank_zero_only
     def log_text(
@@ -121,7 +120,7 @@ class PLClearML(Logger):
 
     def after_save_checkpoint(self, checkpoint_callback: ModelCheckpoint) -> None:
         # log checkpoints as artifacts
-        if self._log_model == "all" or self._log_model is True and checkpoint_callback.save_top_k == -1:
+        if self._log_model == 'all' or self._log_model is True and checkpoint_callback.save_top_k == -1:
             self._scan_and_log_checkpoints(checkpoint_callback)
         elif self._log_model is True:
             self._checkpoint_callback = checkpoint_callback
@@ -147,7 +146,7 @@ class PLClearML(Logger):
 
     @rank_zero_only
     def finalize(self, status: str) -> None:
-        if status != "success":
+        if status != 'success':
             # Currently, checkpoints only get logged on success
             return
         # log checkpoints as artifacts
@@ -161,18 +160,18 @@ class PLClearML(Logger):
         # log iteratively all new checkpoints
         for ckpt_time, ckpt_path, ckpt_score, tag in checkpoints:
             metadata = ({
-                "score": ckpt_score.item() if isinstance(ckpt_score, Tensor) else ckpt_score,
-                "original_filename": Path(ckpt_path).name,
-                "tag": tag,
+                'score': ckpt_score.item() if isinstance(ckpt_score, Tensor) else ckpt_score,
+                'original_filename': Path(ckpt_path).name,
+                'tag': tag,
                 checkpoint_callback.__class__.__name__: {
                     k: getattr(checkpoint_callback, k)
                     for k in [
-                        "monitor",
-                        "mode",
-                        "save_last",
-                        "save_top_k",
-                        "save_weights_only",
-                        "_every_n_train_steps",
+                        'monitor',
+                        'mode',
+                        'save_last',
+                        'save_top_k',
+                        'save_weights_only',
+                        '_every_n_train_steps',
                     ]
                     # ensure it does not break if `ModelCheckpoint` args change
                     if hasattr(checkpoint_callback, k)

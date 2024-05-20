@@ -20,6 +20,8 @@
 import os
 import shutil
 import sys
+
+
 sys.path.insert(0, os.path.abspath('../my_dl_framework'))
 
 
@@ -33,15 +35,15 @@ sys.path.insert(0, os.path.abspath('../my_dl_framework'))
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = ['sphinx.ext.autodoc',
-              "sphinx.ext.intersphinx",
-              "sphinx.ext.todo",
-              "sphinx.ext.autosummary",
-              "sphinx.ext.viewcode",
-              "sphinx.ext.coverage",
-              "sphinx.ext.doctest",
-              "sphinx.ext.ifconfig",
-              "sphinx.ext.mathjax",
-              "sphinx.ext.napoleon",
+              'sphinx.ext.intersphinx',
+              'sphinx.ext.todo',
+              'sphinx.ext.autosummary',
+              'sphinx.ext.viewcode',
+              'sphinx.ext.coverage',
+              'sphinx.ext.doctest',
+              'sphinx.ext.ifconfig',
+              'sphinx.ext.mathjax',
+              'sphinx.ext.napoleon',
               ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -94,8 +96,8 @@ except ImportError:
     from sphinx import apidoc
 
 __location__ = os.path.dirname(__file__)
-output_dir = os.path.join(__location__, "api")
-module_dir = os.path.join(__location__, "../my_dl_framework")
+output_dir = os.path.join(__location__, 'api')
+module_dir = os.path.join(__location__, '../my_dl_framework')
 try:
     shutil.rmtree(output_dir)
 except FileNotFoundError:
@@ -106,14 +108,14 @@ try:
 
     cmd_line = f"sphinx-apidoc --implicit-namespaces -f -o {output_dir} {module_dir}"
 
-    args = cmd_line.split(" ")
-    if tuple(sphinx.__version__.split(".")) >= ("1", "7"):
+    args = cmd_line.split(' ')
+    if tuple(sphinx.__version__.split('.')) >= ('1', '7'):
         # This is a rudimentary parse_version to avoid external dependencies
         args = args[1:]
 
     apidoc.main(args)
 except Exception as e:
-    print("Running `sphinx-apidoc` failed!\n{}".format(e))
+    print('Running `sphinx-apidoc` failed!\n{}'.format(e))
 
 
 # -- Options for HTML output ----------------------------------------------
@@ -202,5 +204,3 @@ latex_elements = {
 #     author, 'WordCount', 'One line description of project.',
 #     'Miscellaneous'),
 #]
-
-

@@ -11,8 +11,8 @@ repos:
 #  hooks:
 #    - id: isort
 #      name: isort (python)
-- repo: https://github.com/google/yapf
-  rev: v0.40.2
-  hooks:
-    - id: yapf
-      name: yapf
+#- repo: https://github.com/google/yapf
+#  rev: v0.40.0
+#  hooks:
+#    - id: yapf
+#      name: yapf
