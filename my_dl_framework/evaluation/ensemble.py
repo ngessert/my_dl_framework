@@ -4,9 +4,7 @@
 
 import argparse
 import os
-import shutil
 from datetime import datetime
-from typing import (Dict, List, Tuple)
 
 import numpy as np
 import pytorch_lightning as pl

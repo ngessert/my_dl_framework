@@ -1,8 +1,6 @@
 """
 CLI functions for training
 """
-from typing import Union
-
 import typer
 
 from my_dl_framework.training.train_pl import run_training

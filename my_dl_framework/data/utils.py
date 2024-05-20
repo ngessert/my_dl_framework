@@ -1,5 +1,6 @@
-from typing import List
-
+"""
+Data handling utils
+"""
 import numpy as np
 import pydicom
 import torch

@@ -59,7 +59,7 @@ def run_training(config_path: str, clearml: bool, num_gpus: Union[int, str, None
             if len(config['run_cv_subset']) == 1:
                 prefix = ''
         prefix = mc.CV_PREFIX + str(cv_idx + 1) if prefix is None else prefix
-        print(f'Starting fold number {cv_idx+1}/{len(training_subsets)}')
+        print(f'Starting fold number {cv_idx+1} / {len(training_subsets)}')
         curr_subfolder_cv = os.path.join(curr_subfolder, 'CV_' + str(cv_idx + 1))
         os.makedirs(curr_subfolder_cv, exist_ok=True)
         # Data
