@@ -18,6 +18,7 @@ jobs:
           python-version: 3.12
       - name: Install dependencies
         run: |
+          pip install poetry
           poetry install
       - name: Pylint
         run: pylint --fail-under=5.0 my_dl_framework
