@@ -3,110 +3,28 @@ Training utility stuff
 """
 import os
 import json
-from typing import Dict, Tuple
-from torch.utils.data import Dataset
+import shutil
+from datetime import datetime
+from typing import Dict, Tuple, List
+
+from clearml.config import running_remotely
+from torch.utils.data import DataLoader
 import torch
-from torchvision.models import get_model
 import pandas as pd
 import numpy as np
 import plotly
-from clearml import Logger
-import matplotlib.pyplot as plt
+from clearml import Logger, Task, Dataset
+from lightning.pytorch.callbacks import Callback, LearningRateMonitor, RichProgressBar
+import lightning.pytorch as pl
+
+from my_dl_framework.data.get_dataset import get_pt_dataset
 from my_dl_framework.evaluation.utils import validate_model_classification
 import my_dl_framework.constants as mc
+from my_dl_framework.utils.pytorch_lightning.minibatch_plot_callback import MBPlotCallback
 
 
-def get_tv_class_model(config: Dict) -> torch.nn.Module:
-    """
-    Get a torchvision classification model and replace output layer
-    :param config:          Dict with config
-    :return:                Torch model
-    """
-    model = get_model(config["classification_model_name"], weights="DEFAULT")
-    if hasattr(model, "classifier"):
-        if isinstance(model.classifier, torch.nn.Sequential):
-            # Squeezenet
-            if len(model.classifier) == 4:
-                final_conv = torch.nn.Conv2d(model.classifier[1].in_channels, config['num_classes'], kernel_size=(1, 1))
-                model.classifier[1] = final_conv
-            else:
-                # Efficientnet
-                in_features = model.classifier[1].in_features
-                model.classifier[1] = torch.nn.Linear(in_features, config['num_classes'])
-        else:
-            # Densenet
-            in_features = model.classifier.in_features
-            model.classifier = torch.nn.Linear(in_features, config['num_classes'])
-    elif hasattr(model, "fc"):
-        # Resnet
-        in_features = model.fc.in_features
-        model.fc = torch.nn.Linear(in_features, config['num_classes'])
-    elif hasattr(model, "heads"):
-        # Vision transformer
-        in_features = model.heads[-1].in_features
-        model.heads[-1] = torch.nn.Linear(in_features, config['num_classes'])
-    elif hasattr(model, "head"):
-        # Swin transformer
-        in_features = model.head.in_features
-        model.head = torch.nn.Linear(in_features, config['num_classes'])
-    else:
-        raise ValueError(f'Output layer replacement not implemented for model {config["classification_model_name"]}')
-    return model
-
-
-def get_lossfunction(config: Dict) -> torch.nn.Module:
-    """
-    Get a loss function
-    :param config:          Dict with config
-    :return:                loss_function object
-    """
-    if config['loss_name'] == "cross_entropy":
-        loss_function = torch.nn.CrossEntropyLoss(weight=config['loss_weights'] if 'loss_weights' in config else None)
-    else:
-        raise ValueError(f'Unknown loss name {config["loss_name"]}')
-    return loss_function
-
-
-def get_optimizer(config: Dict, model: torch.nn.Module) -> torch.optim.Optimizer:
-    """
-    Get an optimizer
-    :param config:      Dict with config
-    :param model:       Torch model
-    :return:            optimizer object
-    """
-    if config['optimizer'] == "Adam":
-        optimizer = torch.optim.Adam(model.parameters(), lr=config['learning_rate'])
-    elif config["optimizer"] == "SGDM":
-        optimizer = torch.optim.SGD(model.parameters(),
-                                    lr=config['learning_rate'],
-                                    momentum=config["sgd_momentum"])
-    else:
-        raise ValueError(f'Unknown optimizer name {config["optimizer"]}')
-    return optimizer
-
-
-def get_lr_scheduler(config: Dict, optimizer: torch.optim.Optimizer):
-    """
-    Get a learning rate scheduler
-    :param config:          Dict with config
-    :param optimizer:       Torch optimizer
-    :return:                lr_scheduler object
-    """
-    if config['lr_scheduler'] == "stepwise":
-        lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=config['step_size'], gamma=1/np.float32(config['lr_step']))
-    else:
-        raise ValueError(f'Unknown lr scheduler name {config["lr_scheduler"]}')
-    return lr_scheduler
-
-
-def get_and_log_metrics_classification(eval_name: str,
-                                       dataloader: torch.utils.data.DataLoader,
-                                       model: torch.nn.Module,
-                                       config: Dict,
-                                       logger: Logger,
-                                       epoch: int,
-                                       curr_subfolder: str,
-                                       use_clearml: bool) -> Tuple[Dict, np.ndarray, np.ndarray]:
+def get_and_log_metrics_classification(eval_name: str, dataloader: torch.utils.data.DataLoader, model: torch.nn.Module, config: Dict, logger: Logger,
+                                       epoch: int, curr_subfolder: str, use_clearml: bool) -> Tuple[Dict, np.ndarray, np.ndarray]:
     """
     Function that calls the metric evaluation and then logs it ClearML and disk
     :param eval_name:       Name of the evaluation, e.g. train or test
@@ -120,10 +38,14 @@ def get_and_log_metrics_classification(eval_name: str,
     :return:                Metrics, predictions, and targets
     """
     print(f'Validating on set {eval_name} of length {len(dataloader)}')
-    metrics, plots, pred, tar = validate_model_classification(model=model, dataloader=dataloader, config=config, max_num_batches=config["max_num_batches_val"], use_cleaml=use_clearml)
+    metrics, plots, pred, tar = validate_model_classification(model=model,
+                                                              dataloader=dataloader,
+                                                              config=config,
+                                                              max_num_batches=config["max_num_batches_val"],
+                                                              use_cleaml=use_clearml)
     # convert to pandas DF
     metric_df = pd.DataFrame.from_dict(metrics)
-    metric_df["classes"] = config["class_names"] + ["Avg"]
+    metric_df["classes"] = config["data"]["class_names"] + ["Avg"]
     metric_df.set_index("classes", inplace=True)
     print("Metrics" + "-" * 20)
     print(metric_df)
@@ -131,10 +53,7 @@ def get_and_log_metrics_classification(eval_name: str,
     if use_clearml:
         logger.report_table(title="Metrics", series="Metrics", iteration=epoch, table_plot=metric_df)
         for metric_name, metric_val in metrics.items():
-            logger.report_scalar(title=metric_name, 
-                                 series=eval_name + " " + metric_name,
-                                 value=np.mean(metric_val),
-                                 iteration=epoch)
+            logger.report_scalar(title=metric_name, series=eval_name + " " + metric_name, value=np.mean(metric_val), iteration=epoch)
         for plot_name, plot in plots.items():
             # Plotly figure
             if isinstance(plot, plotly.graph_objs.Figure):
@@ -159,30 +78,178 @@ def get_and_log_metrics_classification(eval_name: str,
 class NumpyEncoder(json.JSONEncoder):
     """ Numpy encoder for JSON saving.
     """
+
     def default(self, o):
         if isinstance(o, np.ndarray):
             return o.tolist()
         return json.JSONEncoder.default(self, o)
 
 
-def plot_example_batch(images: torch.Tensor, targets: torch.Tensor, idx: int, save_path: str, config: Dict):
-    """ Plots some example batches into clearml and to local path
+def get_dataloaders(config: Dict, images_path: str, labels_path: str, subset_train: List[str],
+                    subset_val: List[str]) -> Tuple[DataLoader, DataLoader, DataLoader]:
     """
-    batch_size = images.shape[0]
-    fig, axes = plt.subplots(batch_size, 1, figsize=(5 * batch_size, 20))
-    for i in range(batch_size):
-        image = images[i, 0, :, :].numpy()
-        target = config["class_names"][targets[i].item()]
-        clearml_logger = Logger.current_logger()
-        if clearml_logger is not None:
-            clearml_logger.report_image(
-                f"{i} of {idx} y={target}",
-                "debug example",
-                iteration=0,
-                image=image,
-            )
-        axes[i].imshow(image, cmap="gray")
-        axes[i].set_title(f'Target {target}', fontsize=5)
-        axes[i].set_axis_off()
-    os.makedirs(os.path.join(save_path, "example_batches"), exist_ok=True)
-    fig.savefig(os.path.join(save_path, "example_batches", "batch_" + str(idx) + ".png"), bbox_inches='tight', pad_inches=0, dpi=300)
+    Sets up the dataloaders
+    :param config:          Full config
+    :param images_path:     Path to images folder
+    :param labels_path:     Path to labels CSV
+    :param subset_train:    List of training cases
+    :param subset_val:      List of validation cases
+    :return:
+    """
+    dataset_train = get_pt_dataset(config=config,
+                                   image_dir=os.path.normpath(images_path),
+                                   path_to_label_csv=os.path.normpath(labels_path),
+                                   subset=subset_train,
+                                   is_training=True,
+                                   tta_options=None)
+    print(f'Size training dataset {len(dataset_train)}')
+
+    dataloader_train = DataLoader(dataset=dataset_train,
+                                  batch_size=config["batch_size"],
+                                  shuffle=True,
+                                  num_workers=4,
+                                  pin_memory=True,
+                                  persistent_workers=True,
+                                  worker_init_fn=None)
+    dataset_val = get_pt_dataset(config=config,
+                                 image_dir=os.path.normpath(images_path),
+                                 path_to_label_csv=os.path.normpath(labels_path),
+                                 subset=subset_val,
+                                 is_training=False,
+                                 tta_options=None)
+    print(f'Size validation dataset {len(dataset_val)}')
+
+    dataloader_val = DataLoader(dataset=dataset_val, batch_size=config["batch_size"], shuffle=False, num_workers=4, pin_memory=True, persistent_workers=True)
+    if config['validate_on_train_set']:
+        dataset_train_val = get_pt_dataset(config=config,
+                                           image_dir=os.path.normpath(images_path),
+                                           path_to_label_csv=os.path.normpath(labels_path),
+                                           subset=subset_train,
+                                           is_training=False,
+                                           tta_options=None)
+        print(f'Size validation dataset {len(dataset_train_val)}')
+        dataloader_train_val = DataLoader(dataset=dataset_train_val,
+                                          batch_size=config["batch_size"],
+                                          shuffle=False,
+                                          num_workers=4,
+                                          pin_memory=True,
+                                          persistent_workers=True)
+    else:
+        dataloader_train_val = None
+    return dataloader_train, dataloader_val, dataloader_train_val
+
+
+def setup_data(config: Dict) -> Tuple[str, str, str]:
+    """
+    Grabs the data from a ClearML dataset.
+
+    :param config:      Full config
+    :return:
+    """
+    cl_dataset = Dataset.get(config["cl_dataset_id"], alias="used_dataset")
+    dataset_metadata = cl_dataset.get_metadata().to_dict()['0']
+    base_path = cl_dataset.get_local_copy(use_soft_links=True)
+    images_path = str(os.path.join(base_path, dataset_metadata["images_dir"]))
+    if "labels_dir" not in dataset_metadata:
+        raise ValueError(f"Dataset {cl_dataset.name} (ID: {cl_dataset.id} does not have labels.")
+    labels_path = str(os.path.join(base_path, dataset_metadata["labels_dir"]))
+    if "csv_name" in dataset_metadata:
+        labels_path = str(os.path.join(labels_path, dataset_metadata["csv_name"]))
+    if "data_split_file" not in dataset_metadata:
+        raise ValueError(f"Dataset {cl_dataset.name} (ID: {cl_dataset.id} does not have a CV split.")
+    cv_file_path = str(os.path.join(base_path, "cv_split", os.path.basename(dataset_metadata["data_split_file"])))
+    return images_path, labels_path, cv_file_path
+
+
+def setup_clearml_training(config: Dict, config_path: str):
+    """
+    Prep clearML IDs
+
+    :param config:          Full config
+    :param config_path:     Path to full config
+    :return:
+    """
+    task_prev = None
+    if running_remotely():
+        task = Task.current_task()
+    else:
+        task = Task.init(project_name='RSNABinary',
+                         task_name=config_path.split(os.sep)[-1],
+                         reuse_last_task_id=False,
+                         auto_connect_frameworks={'matplotlib': False})
+        if config["continue_training_from_clearml"] is not None:
+            task_prev = Task.get_task(task_id=config["continue_training_from_clearml"])
+            print(f'Use ckpts from task {config["continue_training_from_clearml"]}')
+    config = task.connect(config)
+    task.add_tags(config["clearml_tags"])
+    return task, task_prev
+
+
+def get_ckpt_path(config: Dict, curr_subfolder_cv: str, cv_idx: int, task_prev: Task) -> str:
+    """
+    Prep the ckpt path based on whether a ClearML base task is used.
+
+    :param config:              Full config
+    :param curr_subfolder_cv:   Curr CV folder for putting the potential ckpt
+    :param cv_idx:              Subfolder name
+    :param task_prev:           ClearML task to get the previous model from
+    :return:
+    """
+    if config["continue_training"] is not None and os.path.isfile(os.path.join(curr_subfolder_cv, mc.CKPT_NAME)):
+        ckpt_path = os.path.join(curr_subfolder_cv, mc.CKPT_NAME)
+    elif task_prev is not None:
+        print("No local ckpt found, getting ckpt from ClearML")
+        ckpt_path = os.path.join(curr_subfolder_cv, mc.CKPT_NAME)
+        ckpt_path_tmp = task_prev.artifacts[f"model-CV{cv_idx + 1}-latest"].get_local_copy()
+        shutil.copy(ckpt_path_tmp, ckpt_path)
+    else:
+        ckpt_path = None
+    return ckpt_path
+
+
+def setup_local_folders(config: Dict, cv_file_path: str, config_path: str, clearml: bool, task: Task) -> str:
+    """
+    Set up local folders
+
+    :param config:          Full config
+    :param cv_file_path:
+    :param config_path:
+    :param clearml:         Using clearml
+    :param task:            ClearML task
+    :return:
+    """
+    curr_subfolder = os.path.join(os.path.normpath(config['base_path']), "experiments", config_path.replace("\\", "/").split("/")[-1])
+    if config["continue_training"] is not None:
+        curr_subfolder += config["continue_training"]
+    else:
+        curr_subfolder += datetime.now().strftime("%d-%m-%Y-%H-%M-%S")
+    # Copy CV file to folder and clearml for later use in evaluation
+    os.makedirs(curr_subfolder, exist_ok=True)
+    shutil.copy(os.path.normpath(config_path), os.path.join(curr_subfolder, "config.yaml"))
+    shutil.copy(cv_file_path, os.path.join(curr_subfolder, "cv_split_file.json"))
+    if clearml:
+        # Write to disk for easier access
+        with open(os.path.join(curr_subfolder, "clearml_id.txt"), "w", encoding="utf-8") as file:
+            file.write(f"{task.task_id}")
+    if task is not None:
+        task.upload_artifact("cv_split_file", os.path.normpath(cv_file_path))
+    return curr_subfolder
+
+
+def get_callbacks(config: Dict, prefix: str, curr_subfolder_cv: str, iter_per_epoch: int) -> List[Callback]:
+    callback_list = list()
+    checkpoint_callback = pl.callbacks.ModelCheckpoint(
+        monitor=config["val_best_metric"] + prefix,
+        save_last=True,
+        save_top_k=1,
+        dirpath=curr_subfolder_cv,
+        filename='train-{epoch:02d}-{' + config["val_best_metric"] + ':.4f}',
+        mode=config["val_best_target"],
+        auto_insert_metric_name=True,
+        every_n_epochs=config["ckpt_every_n_epochs"],
+    )
+    callback_list.append(checkpoint_callback)
+    callback_list.append(MBPlotCallback(curr_subfolder_cv, config))
+    callback_list.append(LearningRateMonitor(logging_interval="epoch"))
+    callback_list.append(RichProgressBar(refresh_rate=iter_per_epoch // 5))
+    return callback_list

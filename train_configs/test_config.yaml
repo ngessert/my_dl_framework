@@ -1,18 +1,29 @@
-dataset_type: "RSNAChallengeBinary"
+# data settings
+data:
+  dataset_type: "RSNAChallengeBinary"
+  cl_base_dataset_id: null
+  csv_name: "stage_2_train_labels.csv"
+  images_dir: "C:/data/RSNA_challenge/training_images"
+  labels_dir: "C:/data/RSNA_challenge/training_labels"
+  # ClearML dataset params
+  new_dataset_name: "RSNA base dataset"
+  dataset_project: "RSNA"
+  dataset_output_uri: "C:\\data\\clearml_datasets"
+  class_names: ["Class0", "Class1"]
+  # CV splitting
+  data_split_file: "C:/sources/my_dl_framework/cv_splits/cv_split_3fold.json"
+# Generated dataset ID
+cl_dataset_id: c06744965c344ea1bc862147400892a0
+
 base_path: "C:\\data\\RSNA_challenge"
-class_names: ["Class0", "Class1"]
 clearml_tags: ["DenseNet", "Debugging"]
-# CV splitting
-data_split_file: "C:\\sources\\my_dl_framework\\cv_splits\\cv_split_3fold.json"
-run_cv_subset: [0, 1, 2]  # Specify a subset of CV splits to train
-csv_name: "stage_2_train_labels.csv"
-training_image_dir: "training_images"
 # Training settings
+run_cv_subset: [0]  # Specify a subset of CV splits to train
 batch_size: 16
 lr_scheduler: stepwise
 step_size: 50
 lr_step: 2
-num_epochs: 10
+num_epochs: 3
 optimizer: "Adam"
 learning_rate: 0.00005
 loss_name: cross_entropy
@@ -39,5 +50,5 @@ validate_every_x_epochs: 1
 validate_on_train_set: False
 test_aug_ensemble_mode: mean
 max_num_batches_val: 50
-val_best_metric: auc_score_mean_validation
+val_best_metric: auc-score_mean_validation
 val_best_target: max

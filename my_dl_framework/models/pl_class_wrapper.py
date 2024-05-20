@@ -2,16 +2,16 @@ from typing import Dict, Any, List, Optional
 import numpy as np
 import pandas as pd
 import torch
-from pytorch_lightning.loggers.logger import Logger
+from lightning.pytorch.loggers.logger import Logger
 from torch.nn import functional as F
-import pytorch_lightning as pl
+import lightning.pytorch as pl
 
 from my_dl_framework.evaluation.utils import calculate_metrics
-from my_dl_framework.training.utils import get_lossfunction, get_lr_scheduler, get_tv_class_model, get_optimizer
+from my_dl_framework.models.utils import get_lossfunction, get_lr_scheduler, get_tv_class_model, get_optimizer
 from my_dl_framework.utils.pytorch_lightning.clearml_logger import PLClearML
 
 
-def stack_list_of_dicts(list_of_dicts: Dict[str, Any], keys: List[str], to_numpy: bool = False) -> Dict[str, np.ndarray]:
+def stack_list_of_dicts(list_of_dicts: List[Dict[str, Any]], keys: List[str], to_numpy: bool = False) -> Dict[str, np.ndarray]:
     """
     Takes a list of dicts and concatenates the tensors in them, then converts them to numpy
     :param list_of_dicts:       List of dicts with tensors as values
@@ -37,10 +37,8 @@ def stack_list_of_dicts(list_of_dicts: Dict[str, Any], keys: List[str], to_numpy
 class PLClassificationWrapper(pl.LightningModule):
     """ Pytorch lightning wrapper for classification models
     """
-    def __init__(self, config: Dict, 
-                 training_set_len: int = 0,
-                 is_trainval: bool = False,
-                 prefix: str = ""):
+
+    def __init__(self, config: Dict, training_set_len: int = 0, is_trainval: bool = False, prefix: str = ""):
         super().__init__()
         self.config = config
         self.model = get_tv_class_model(config=self.config)
@@ -51,6 +49,9 @@ class PLClassificationWrapper(pl.LightningModule):
         self.predictions = None
         self.targets = None
         self.prefix = prefix
+
+        self.training_step_outputs = list()
+        self.validation_step_outputs = list()
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         res = self.model(x)
@@ -65,79 +66,52 @@ class PLClassificationWrapper(pl.LightningModule):
         _, images, targets = train_batch
         outputs = self.model(images)
         loss = self.loss_function(outputs, targets)
-        return {"loss": loss, "batch_idx": batch_idx}
-
-    def training_step_end(self, step_output):
-        if isinstance(step_output, list):
-            stacked_dict = stack_list_of_dicts(step_output, ["loss"], to_numpy=False)
-            batch_idx = step_output[0]["batch_idx"]
-            loss = torch.mean(torch.stack(stacked_dict["loss"]))
-        else:
-            batch_idx = step_output["batch_idx"]
-            loss = step_output["loss"]
-        # Track loss
-        self.log("train_loss" + self.prefix, loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
+        self.log("train_loss" + self.prefix, loss, on_step=False, on_epoch=True, prog_bar=True, logger=True)
         return {"loss": loss, "batch_idx": batch_idx}
 
     def validation_step(self, val_batch, batch_idx, dataloader_idx=0):
         indices, images, targets = val_batch
         outputs = F.softmax(self.model(images), dim=1)
-        return_dict = {"outputs": outputs,
-                       "targets": targets,
-                       "indices": indices,
-                       "dataloader_idx": dataloader_idx}
+        return_dict = {"outputs": outputs, "targets": targets, "indices": indices, "dataloader_idx": dataloader_idx}
+        self.validation_step_outputs.append(return_dict)
         return return_dict
 
-    def validation_step_end(self, step_output):
-        if isinstance(step_output, list):
-            stacked_dict = stack_list_of_dicts(step_output, ["outputs", "targets", "indices"], to_numpy=False)
-        else:
-            stacked_dict = step_output
-        return {"outputs": stacked_dict["outputs"],
-                "targets": stacked_dict["targets"],
-                "indices": stacked_dict["indices"],
-                "dataloader_idx": step_output["dataloader_idx"]}
-
-    def calc_and_log_metrics(self,
-                             predictions: np.ndarray,
-                             targets: np.ndarray,
-                             eval_name: str,
-                             prefix: str,
-                             step: int,
-                             loggers: Optional[List[Logger]] = None,
-                             ):
-        metrics, plots = calculate_metrics(predictions=predictions,
-                                           targets=targets,
-                                           class_names=self.config["class_names"])
-        for i in range(len(self.config["class_names"])):
-            log_dict = {key + "_" + self.config["class_names"][i] + "_" + eval_name + prefix: val[i] for key, val in metrics.items()}
+    def calc_and_log_metrics(
+        self,
+        predictions: np.ndarray,
+        targets: np.ndarray,
+        eval_name: str,
+        prefix: str,
+        step: int,
+        loggers: Optional[List[Logger]] = None,
+    ):
+        metrics, plots = calculate_metrics(predictions=predictions, targets=targets, class_names=self.config["data"]["class_names"])
+        for i in range(len(self.config["data"]["class_names"])):
+            log_dict = {key + "_" + self.config["data"]["class_names"][i] + "_" + eval_name + prefix: val[i] for key, val in metrics.items()}
             if loggers is None:
-                self.log_dict(log_dict)
+                self.log_dict(log_dict, on_step=False, on_epoch=True)
             else:
                 for logger in loggers:
-                    logger.log_metrics(log_dict)
+                    logger.log_metrics(log_dict, step=step)
         log_dict = {key + "_mean_" + eval_name + prefix: val[-1] for key, val in metrics.items()}
         if loggers is None:
-            self.log_dict(log_dict)
+            self.log_dict(log_dict, on_step=False, on_epoch=True)
         else:
             for logger in loggers:
-                logger.log_metrics(log_dict)
+                logger.log_metrics(log_dict, step=step)
         if loggers is None:
             loggers = self.loggers
         for logger in loggers:
             if isinstance(logger, PLClearML):
-                logger.log_plotly(title=eval_name + prefix,
-                                  plotly_obj_dict=plots,
-                                  step=step)
+                logger.log_plotly(title=eval_name + prefix, plotly_obj_dict=plots, step=step)
                 metric_df = pd.DataFrame.from_dict(metrics)
-                metric_df["classes"] = self.config["class_names"] + ["Avg"]
+                metric_df["classes"] = self.config["data"]["class_names"] + ["Avg"]
                 metric_df.set_index("classes", inplace=True)
-                logger.log_table(title="Metrics " + eval_name + prefix,
-                                 step=step,
-                                 dataframe=metric_df)
+                logger.log_table(title="Metrics " + eval_name + prefix, step=step, dataframe=metric_df)
 
-    def validation_epoch_end(self, outputs):
+    def on_validation_epoch_end(self):
         # Assumes val loader is put first
+        outputs = self.validation_step_outputs
         eval_name = "validation" if outputs[0]["dataloader_idx"] == 0 or self.is_trainval else "train_val"
         stacked_dict = stack_list_of_dicts(outputs, ["outputs", "targets", "indices"], to_numpy=True)
         stacked_preds = stacked_dict["outputs"]
@@ -157,9 +131,11 @@ class PLClassificationWrapper(pl.LightningModule):
         # Store for usage later
         self.predictions = predictions
         self.targets = targets
-        self.calc_and_log_metrics(loggers=None, # Use self.log .. so it's properly registered
-                                  predictions=predictions,
-                                  targets=targets,
-                                  eval_name=eval_name,
-                                  prefix=self.prefix,
-                                  step=self.current_epoch)
+        self.calc_and_log_metrics(
+            loggers=None,  # Use self.log .. so it's properly registered
+            predictions=predictions,
+            targets=targets,
+            eval_name=eval_name,
+            prefix=self.prefix,
+            step=self.current_epoch)
+        self.validation_step_outputs.clear()

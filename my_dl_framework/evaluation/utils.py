@@ -35,10 +35,7 @@ def get_roc_curve(class_names: List[str], predictions: np.ndarray, targets: np.n
     # Create an empty figure, and iteratively add new lines
     # every time we compute a new class
     fig = go.Figure()
-    fig.add_shape(
-        type='line', line=dict(dash='dash'),
-        x0=0, x1=1, y0=0, y1=1
-    )
+    fig.add_shape(type='line', line=dict(dash='dash'), x0=0, x1=1, y0=0, y1=1)
     auc_scores = list()
     for i in range(predictions.shape[1]):
         y_score = predictions[:, i]
@@ -54,13 +51,12 @@ def get_roc_curve(class_names: List[str], predictions: np.ndarray, targets: np.n
         name = f"{class_names[i]} (AUC={auc_score:.2f})"
         fig.add_trace(go.Scatter(x=fpr, y=tpr, name=name, mode='lines'))
 
-    fig.update_layout(
-        xaxis_title='False Positive Rate',
-        yaxis_title='True Positive Rate',
-        yaxis=dict(scaleanchor="x", scaleratio=1),
-        xaxis=dict(constrain='domain'),
-        width=700, height=500
-    )
+    fig.update_layout(xaxis_title='False Positive Rate',
+                      yaxis_title='True Positive Rate',
+                      yaxis=dict(scaleanchor="x", scaleratio=1),
+                      xaxis=dict(constrain='domain'),
+                      width=700,
+                      height=500)
     return fig, auc_scores
 
 
@@ -84,24 +80,20 @@ def get_confusion_matrix(conf_matrix: np.ndarray, class_names: List[str]) -> go.
     fig = ff.create_annotated_heatmap(z, x=x, y=y, annotation_text=z_text, colorscale='Viridis', showscale=True)
 
     # add title
-    fig.update_layout(title_text='<b>Confusion matrix</b>',
-                      xaxis=dict(title='Predicted'),
-                      yaxis=dict(title='Target')
-                      )
+    fig.update_layout(title_text='<b>Confusion matrix</b>', xaxis=dict(title='Predicted'), yaxis=dict(title='Target'))
 
     # add custom xaxis title
-    fig.add_annotation(dict(font=dict(color="black", size=14),
-                            x=0.5,
-                            y=-0.15,
-                            showarrow=False,
-                            text="Predicted value",
-                            ))
+    fig.add_annotation(dict(
+        font=dict(color="black", size=14),
+        x=0.5,
+        y=-0.15,
+        showarrow=False,
+        text="Predicted value",
+    ))
     return fig
 
 
-def calculate_metrics(predictions: np.ndarray, 
-                      targets: np.ndarray,
-                      class_names: List[str]) -> Tuple[Dict, Dict]:
+def calculate_metrics(predictions: np.ndarray, targets: np.ndarray, class_names: List[str]) -> Tuple[Dict, Dict]:
     """ Calculate classification metrics from predictions (BxC) 
         and targets (B)
     """
@@ -112,7 +104,7 @@ def calculate_metrics(predictions: np.ndarray,
     except ValueError as e:
         log_loss_value = 100
         print(f"Warning: no log loss caluclated, error: {e}")
-    log_loss_value = np.repeat(log_loss_value, len(class_names) +1)
+    log_loss_value = np.repeat(log_loss_value, len(class_names) + 1)
     accuracy = np.zeros([len(class_names) + 1])
     accuracy[:-1] = np.mean(np.equal(np.argmax(predictions, 1), targets))
     accuracy[-1] = np.mean(accuracy[:-1])
@@ -144,21 +136,18 @@ def calculate_metrics(predictions: np.ndarray,
     auc_scores = np.zeros([len(class_names) + 1])
     fig, auc_scores[:-1] = get_roc_curve(class_names=class_names, predictions=predictions, targets=targets)
     auc_scores[-1] = np.mean(auc_scores[:-1])
-    plots["roc_curve"] = fig
-    metrics["log_loss_value"] = log_loss_value
+    plots["roc-curve"] = fig
+    metrics["log-loss-value"] = log_loss_value
     metrics["accuracy"] = accuracy
-    metrics["f1_score"] = f1
+    metrics["f1-score"] = f1
     metrics["sensitivity"] = sensitivity
     metrics["specificity"] = specificity
     metrics["precision"] = precision
-    metrics["auc_score"] = auc_scores
+    metrics["auc-score"] = auc_scores
     return metrics, plots
 
 
-def aggregate_pred_and_tar(config: Dict,
-                           all_predictions: Dict,
-                           all_targets: Dict,
-                           class_names: List[str]) -> Tuple[np.ndarray, np.ndarray]:
+def aggregate_pred_and_tar(config: Dict, all_predictions: Dict, all_targets: Dict, class_names: List[str]) -> Tuple[np.ndarray, np.ndarray]:
     """
     Helper function to aggregate predictions and targets into arrays
     :param config:              Dict with config
@@ -193,7 +182,7 @@ def validate_model_classification(model: torch.nn.Module,
     :return:                Metrics, plots, predictions, targets
     """
     model.eval()
-    class_names = config["class_names"]
+    class_names = config["data"]["class_names"]
     # Get predictions
     all_predictions = dict()
     all_targets = dict()
@@ -302,9 +291,7 @@ def gather_predictions(all_eval_folders: List[str]) -> Tuple[List, List, Dict]:
     return pred_list, tar_list, training_config
 
 
-def define_tta_options(tta_flip_horz: bool,
-                       tta_flip_vert: bool,
-                       tta_multi_eq_crop: int):
+def define_tta_options(tta_flip_horz: bool, tta_flip_vert: bool, tta_multi_eq_crop: int):
     """
     Prepare tta options so they are more easily passable
     :param tta_flip_horz:
@@ -393,12 +380,7 @@ def get_data_split(cv_eval: bool, folder: str) -> Dict:
     return data_split
 
 
-def get_clearml_tags(cv_eval: bool,
-                     eval_on_train: bool,
-                     limit_batches: int,
-                     dont_log_splits: bool,
-                     tta_flip_horz: bool,
-                     tta_flip_vert: bool,
+def get_clearml_tags(cv_eval: bool, eval_on_train: bool, limit_batches: int, dont_log_splits: bool, tta_flip_horz: bool, tta_flip_vert: bool,
                      tta_multi_eq_crop: int):
     """
     Organize tags to add them to ClearML
@@ -424,18 +406,8 @@ def get_clearml_tags(cv_eval: bool,
     return tags
 
 
-def aggregate_eval_results(cv_eval: bool,
-                           eval_on_train: bool,
-                           pred_list: List,
-                           tar_list: List,
-                           pred_train_val_list: List,
-                           tar_train_val_list: List,
-                           curr_pred_folder: str,
-                           model: pl.LightningModule,
-                           label_csv_path,
-                           loggers: List,
-                           clearml: bool,
-                           task: Task):
+def aggregate_eval_results(cv_eval: bool, eval_on_train: bool, pred_list: List, tar_list: List, pred_train_val_list: List, tar_train_val_list: List,
+                           curr_pred_folder: str, model: pl.LightningModule, label_csv_path, loggers: List, clearml: bool, task: Task):
     """
     Aggregate collected CV results, evaluate again, and upload to ClearML
     :return:
@@ -455,8 +427,7 @@ def aggregate_eval_results(cv_eval: bool,
             pred_all = np.squeeze(np.mean(pred_list, axis=0, keepdims=False), axis=0)
             tar_all = np.squeeze(np.mean(tar_list, axis=0, keepdims=False), axis=0)
         if eval_on_train:
-            pred_train_val_all = np.concatenate(pred_train_val_list, axis=0).reshape(
-                [-1, pred_train_val_list[0].shape[-1]])
+            pred_train_val_all = np.concatenate(pred_train_val_list, axis=0).reshape([-1, pred_train_val_list[0].shape[-1]])
             tar_train_val_all = np.concatenate(tar_train_val_list, axis=0).reshape([-1])
         np.save(os.path.join(curr_pred_folder, "predictions_all.npy"), pred_all)
         np.save(os.path.join(curr_pred_folder, "targets_all.npy"), tar_all)
@@ -469,12 +440,7 @@ def aggregate_eval_results(cv_eval: bool,
             task.upload_artifact(f"tar arr {prefix}", os.path.join(curr_pred_folder, "targets_all.npy"))
         # Perform evaluation through last model
         if cv_eval or label_csv_path is not None:
-            model.calc_and_log_metrics(loggers=loggers,
-                                       predictions=pred_all,
-                                       targets=tar_all,
-                                       eval_name="validation",
-                                       prefix=prefix,
-                                       step=0)
+            model.calc_and_log_metrics(loggers=loggers, predictions=pred_all, targets=tar_all, eval_name="validation", prefix=prefix, step=0)
         if pred_train_val_all is not None:
             model.calc_and_log_metrics(loggers=loggers,
                                        predictions=pred_train_val_all,
@@ -498,8 +464,7 @@ def setup_clearml(clearml: bool, tags: List, arg_dict: Dict, folder: str):
                              task_name=folder.split(os.sep)[-1],
                              reuse_last_task_id=False,
                              auto_connect_frameworks={'matplotlib': False},
-                             task_type=TaskTypes.inference
-                             )
+                             task_type=TaskTypes.inference)
         task.connect(arg_dict)
         task.add_tags(tags)
         # Upload config for potential later use
@@ -507,8 +472,8 @@ def setup_clearml(clearml: bool, tags: List, arg_dict: Dict, folder: str):
     return task
 
 
-def run_checks(curr_subfolder_cv: str, data_split: Dict, label_csv_path: str, cv_eval: bool, image_path: str,
-               config: Dict, cv_idx: int) -> Tuple[bool, str, List, List]:
+def run_checks(curr_subfolder_cv: str, data_split: Dict, label_csv_path: str, cv_eval: bool, image_path: str, config: Dict,
+               cv_idx: int) -> Tuple[bool, str, List, List]:
     """
     Run some checks
     :return:
@@ -531,8 +496,7 @@ def run_checks(curr_subfolder_cv: str, data_split: Dict, label_csv_path: str, cv
     if label_csv_path is not None:
         path_to_label_csv = label_csv_path
     elif cv_eval:
-        path_to_label_csv = os.path.join(image_path.replace(image_path.split(os.sep)[-1], ""),
-                                         config['csv_name'])
+        path_to_label_csv = os.path.join(image_path.replace(image_path.split(os.sep)[-1], ""), config['csv_name'])
     else:
         path_to_label_csv = None
     return continue_loop, path_to_label_csv, subset_val, subset_train

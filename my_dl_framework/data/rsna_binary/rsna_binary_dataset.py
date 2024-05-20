@@ -6,7 +6,8 @@ import torch
 from torchvision import transforms
 import pandas as pd
 import numpy as np
-
+import plotly.graph_objects as go
+import plotly.express as px
 from my_dl_framework.data.utils import load_any_image, ZeroOneNorm, AddBatchDim, FlipTTA, MultiEqualCrop
 
 
@@ -14,8 +15,15 @@ class RSNAChallengeBinaryDataset(Dataset):
     """
     Dataset for RSNA challenge classification task
     """
-    def __init__(self, config: Dict, image_dir: str, path_to_label_csv: Union[str, None], subset: Union[List[str], None], is_training: bool,
-                 allow_missing_target: bool = False, tta_options: Dict = None):
+
+    def __init__(self,
+                 config: Dict,
+                 image_dir: str,
+                 path_to_label_csv: Union[str, None],
+                 subset: Union[List[str], None],
+                 is_training: bool,
+                 allow_missing_target: bool = False,
+                 tta_options: Dict = None):
         self.config = config
         self.is_training = is_training
         self.subset = subset
@@ -28,12 +36,12 @@ class RSNAChallengeBinaryDataset(Dataset):
             self.labels = None
         # Get images
         if self.subset is not None:
-            self.image_paths = [file_name for file_name in glob(os.path.join(image_dir, "*"))
-                                if os.path.isfile(file_name) and
-                                os.path.normpath(file_name).split(os.path.sep)[-1].split(".")[0] in self.subset]
+            self.image_paths = [
+                file_name for file_name in glob(os.path.join(image_dir, "*"))
+                if os.path.isfile(file_name) and os.path.normpath(file_name).split(os.path.sep)[-1].split(".")[0] in self.subset
+            ]
         else:
-            self.image_paths = [file_name for file_name in glob(os.path.join(image_dir, "*"))
-                                if os.path.isfile(file_name)]
+            self.image_paths = [file_name for file_name in glob(os.path.join(image_dir, "*")) if os.path.isfile(file_name)]
         print("Len img paths", len(self.image_paths))
         self.images = list()
         if self.config['preload_images']:
@@ -59,12 +67,11 @@ class RSNAChallengeBinaryDataset(Dataset):
         if self.config['random_flipud']:
             transform_list.append(transforms.RandomVerticalFlip())
         if self.config['color_jitter'] is not None:
-            transform_list.append(transforms.ColorJitter(
-                brightness=self.config['color_jitter'][0],
-                contrast=self.config['color_jitter'][1],
-                saturation=self.config['color_jitter'][2],
-                hue=self.config['color_jitter'][3]
-            ))
+            transform_list.append(
+                transforms.ColorJitter(brightness=self.config['color_jitter'][0],
+                                       contrast=self.config['color_jitter'][1],
+                                       saturation=self.config['color_jitter'][2],
+                                       hue=self.config['color_jitter'][3]))
         return transform_list
 
     def _add_inference_transforms(self, transform_list: List) -> List:
@@ -73,8 +80,7 @@ class RSNAChallengeBinaryDataset(Dataset):
         if self.tta_options:
             transform_list.append(AddBatchDim())
         if "multi_eq_crop" in self.tta_options:
-            transform_list.append(
-                MultiEqualCrop(num_per_axis=self.tta_options["multi_eq_crop"], crop_size=self.config["random_crop"]))
+            transform_list.append(MultiEqualCrop(num_per_axis=self.tta_options["multi_eq_crop"], crop_size=self.config["random_crop"]))
         if "flip_horz" in self.tta_options:
             transform_list.append(FlipTTA(flip_axis=3))
         if "flip_vert" in self.tta_options:
@@ -119,3 +125,12 @@ class RSNAChallengeBinaryDataset(Dataset):
             label = torch.ones([num_reps], dtype=torch.int32) * label
             idx = torch.ones([num_reps], dtype=torch.int32) * idx
         return idx, image, label
+
+
+def plot_rsna_properties(dataset_info: Dict) -> Dict[str, go.Figure]:
+    all_figures = dict()
+    if dataset_info["label_csv"]:
+        labels = pd.read_csv(dataset_info["label_csv"])
+        fig = px.histogram(labels, x="Target")
+        all_figures["Label Distribution"] = fig
+    return all_figures
