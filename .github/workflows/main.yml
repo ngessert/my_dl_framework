@@ -24,6 +24,11 @@ jobs:
         run: poetry run pylint --fail-under=5.0 my_dl_framework
       - name: Test with pytest
         run: |
+          export CLEARML_API_HOST="https://api.clear.ml"
+          export CLEARML_WEB_HOST="https://app.clear.ml"
+          export CLEARML_FILES_HOST="https://files.clear.ml"
+          export CLEARML_API_ACCESS_KEY=${{ secrets.CLEARML_API_ACCESS_KEY }}
+          export CLEARML_API_SECRET_KEY=${{ secrets.CLEARML_API_SECRET_KEY }}
           poetry run pytest --durations=0 --cov=. --cov-report xml:coverage.xml --junitxml=results.xml --verbose tests/
 
       - name: SonarCloud Scan
