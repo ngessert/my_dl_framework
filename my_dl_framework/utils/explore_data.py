@@ -3,7 +3,7 @@ from glob import glob
 
 import numpy as np
 
-from my_dl_framework.training.utils import load_any_image
+from my_dl_framework.data.utils import load_any_image
 
 image_paths = [file_name for file_name in glob(os.path.join(r'C:\data\RSNA_challenge', 'training_images', '*')) if os.path.isfile(file_name)]
 

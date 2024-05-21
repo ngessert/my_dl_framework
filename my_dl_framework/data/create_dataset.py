@@ -4,6 +4,7 @@ This dataset can be consumed by a trained or evaluation script.
 """
 import argparse
 import os
+from glob import glob
 
 import pandas as pd
 import yaml
@@ -12,7 +13,7 @@ from clearml import Dataset
 from my_dl_framework.data.get_dataset import get_dataset_stats
 
 
-def create_dataset(config_path: str):
+def create_dataset(config_path: str) -> str:
     """
     Creates a ClearML data set for logging purposes.
     :param config_path:         Config that contains a data section
@@ -26,11 +27,11 @@ def create_dataset(config_path: str):
     src_labels = None
     src_cv_file_path = None
     if data_config['images_dir'] is not None:
-        src_images = os.path.normpath(data_config['images_dir'])
+        src_images = glob(os.path.normpath(data_config['images_dir']) + '/*')
         if data_config['labels_dir']:
-            src_labels = os.path.normpath(data_config['labels_dir'])
+            src_labels = glob(os.path.normpath(data_config['labels_dir']) + '/*')
         if data_config['data_split_file']:
-            src_cv_file_path = os.path.normpath(os.path.dirname(data_config['data_split_file']))
+            src_cv_file_path = glob(os.path.normpath(os.path.dirname(data_config['data_split_file'])) + '/*')
     elif data_config['cl_base_dataset_id'] is not None:
         base_dataset = Dataset.get(dataset_id=data_config['cl_base_dataset_id'])
         src_data_path = base_dataset.get_local_copy(use_soft_links=True)
@@ -64,10 +65,11 @@ def create_dataset(config_path: str):
     new_dataset.set_metadata(pd.DataFrame.from_dict(dataset_metadata).T)
     # Add data statistics
     dataset_logger = new_dataset.get_logger()
-    for fig_title, fig in get_dataset_stats({'label_csv': os.path.join(src_labels, data_config['csv_name'])}, data_config['dataset_type']).items():
+    for fig_title, fig in get_dataset_stats({'label_csv': os.path.join(data_config['labels_dir'], data_config['csv_name'])}, data_config['dataset_type']).items():
         dataset_logger.report_plotly(fig_title, fig_title, fig, 0)
 
     new_dataset.finalize(auto_upload=True)
+    return new_dataset.id
 
 
 if __name__ == '__main__':

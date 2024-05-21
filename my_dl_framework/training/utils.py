@@ -162,7 +162,7 @@ def setup_data(config: Dict) -> Tuple[str, str, str]:
     """
     cl_dataset = Dataset.get(config['cl_dataset_id'], alias='used_dataset')
     dataset_metadata = cl_dataset.get_metadata().to_dict()['0']
-    base_path = cl_dataset.get_local_copy(use_soft_links=True)
+    base_path = cl_dataset.get_local_copy(use_soft_links=False)
     images_path = str(os.path.join(base_path, dataset_metadata['images_dir']))
     if 'labels_dir' not in dataset_metadata:
         raise ValueError(f"Dataset {cl_dataset.name} (ID: {cl_dataset.id} does not have labels.")
