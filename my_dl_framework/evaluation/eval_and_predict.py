@@ -10,7 +10,7 @@ from glob import glob
 from typing import Optional
 
 import numpy as np
-import pytorch_lightning as pl
+import lightning.pytorch as pl
 import yaml
 from torch.utils.data import DataLoader
 
@@ -102,7 +102,6 @@ def run_prediction(folder: str, clearml_id: Optional[str], clearml: bool, eval_o
                              accelerator='auto',
                              max_epochs=config['num_epochs'],
                              callbacks=[MBPlotCallback(curr_subfolder_cv_pred, config)],
-                             auto_select_gpus=True,
                              deterministic=True,
                              logger=curr_loggers,
                              limit_val_batches=limit_batches)

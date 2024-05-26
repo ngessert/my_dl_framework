@@ -11,7 +11,7 @@ data:
   class_names: ["Class0", "Class1"]
   data_split_file: "tests/test_cv_splits/cv_split_3fold.json"
 # Generated dataset ID
-cl_dataset_id: 17565cfc135847ee9c4bf969e3cdbd26
+cl_dataset_id: null  # currenlty not working in github actions
 base_path: tests/test_data/rsna_binary
 # Training settings
 run_cv_subset: [0, 1, 2]  # Specify a subset of CV splits to train

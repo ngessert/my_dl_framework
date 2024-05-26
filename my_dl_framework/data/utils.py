@@ -1,6 +1,7 @@
 """
 Data handling utils
 """
+from PIL import Image
 import numpy as np
 import pydicom
 import torch
@@ -16,6 +17,8 @@ def load_any_image(image_path: str) -> np.ndarray:
     if image_path.endswith('.dcm'):
         dicom = pydicom.dcmread(image_path)
         image = dicom.pixel_array
+    elif image_path.endswith('.png'):
+        image = np.array(Image.open(image_path))
     else:
         raise ValueError(f'Unknown image type {image_path}')
     return image

@@ -160,18 +160,25 @@ def setup_data(config: Dict) -> Tuple[str, str, str]:
     :param config:      Full config
     :return:
     """
-    cl_dataset = Dataset.get(config['cl_dataset_id'], alias='used_dataset')
-    dataset_metadata = cl_dataset.get_metadata().to_dict()['0']
-    base_path = cl_dataset.get_local_copy(use_soft_links=False)
-    images_path = str(os.path.join(base_path, dataset_metadata['images_dir']))
-    if 'labels_dir' not in dataset_metadata:
-        raise ValueError(f"Dataset {cl_dataset.name} (ID: {cl_dataset.id} does not have labels.")
-    labels_path = str(os.path.join(base_path, dataset_metadata['labels_dir']))
-    if 'csv_name' in dataset_metadata:
-        labels_path = str(os.path.join(labels_path, dataset_metadata['csv_name']))
-    if 'data_split_file' not in dataset_metadata:
-        raise ValueError(f"Dataset {cl_dataset.name} (ID: {cl_dataset.id} does not have a CV split.")
-    cv_file_path = str(os.path.join(base_path, 'cv_split', os.path.basename(dataset_metadata['data_split_file'])))
+    if config.get('cl_dataset_id'):
+        cl_dataset = Dataset.get(config['cl_dataset_id'], alias='used_dataset')
+        dataset_metadata = cl_dataset.get_metadata().to_dict()['0']
+        base_path = cl_dataset.get_local_copy(use_soft_links=False)
+        images_path = str(os.path.join(base_path, dataset_metadata['images_dir']))
+        if 'labels_dir' not in dataset_metadata:
+            raise ValueError(f"Dataset {cl_dataset.name} (ID: {cl_dataset.id} does not have labels.")
+        labels_path = str(os.path.join(base_path, dataset_metadata['labels_dir']))
+        if 'csv_name' in dataset_metadata:
+            labels_path = str(os.path.join(labels_path, dataset_metadata['csv_name']))
+        if 'data_split_file' not in dataset_metadata:
+            raise ValueError(f"Dataset {cl_dataset.name} (ID: {cl_dataset.id} does not have a CV split.")
+        cv_file_path = str(os.path.join(base_path, 'cv_split', os.path.basename(dataset_metadata['data_split_file'])))
+    else:
+        images_path = config['data']['images_dir']
+        labels_path = config['data']['labels_path']
+        if 'csv_name' in config['data']:
+            labels_path = str(os.path.join(labels_path, config['data']['csv_name']))
+        cv_file_path = config['data']['data_split_file']
     return images_path, labels_path, cv_file_path
 
 
