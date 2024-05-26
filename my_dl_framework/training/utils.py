@@ -175,7 +175,7 @@ def setup_data(config: Dict) -> Tuple[str, str, str]:
         cv_file_path = str(os.path.join(base_path, 'cv_split', os.path.basename(dataset_metadata['data_split_file'])))
     else:
         images_path = config['data']['images_dir']
-        labels_path = config['data']['labels_path']
+        labels_path = config['data']['labels_dir']
         if 'csv_name' in config['data']:
             labels_path = str(os.path.join(labels_path, config['data']['csv_name']))
         cv_file_path = config['data']['data_split_file']
