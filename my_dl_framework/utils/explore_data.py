@@ -5,8 +5,7 @@ import numpy as np
 
 from my_dl_framework.data.utils import load_any_image
 
-# image_paths = [file_name for file_name in glob(os.path.join(r'C:\data\RSNA_challenge', 'training_images', '*')) if os.path.isfile(file_name)]
-image_paths = [file_name for file_name in glob(os.path.join(r'C:\data\wound-segmentation\data\Foot Ulcer Segmentation Challenge\train\images', '*')) if os.path.isfile(file_name)]
+image_paths = [file_name for file_name in glob(os.path.join(r'C:\data\RSNA_challenge', 'training_images', '*')) if os.path.isfile(file_name)]
 
 all_min = []
 all_max = []
