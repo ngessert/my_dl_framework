@@ -1,14 +1,16 @@
 import os
 from glob import glob
-from typing import Dict, List, Tuple, Union
-from torch.utils.data import Dataset
-import torch
-from torchvision import transforms
-import pandas as pd
+from typing import (Dict, List, Tuple, Union)
+
 import numpy as np
-import plotly.graph_objects as go
+import pandas as pd
 import plotly.express as px
-from my_dl_framework.data.utils import load_any_image, ZeroOneNorm, AddBatchDim, FlipTTA, MultiEqualCrop
+import plotly.graph_objects as go
+import torch
+from torch.utils.data import Dataset
+from torchvision import transforms
+
+from my_dl_framework.data.utils import (AddBatchDim, FlipTTA, MultiEqualCrop, ZeroOneNorm, load_any_image)
 
 
 class RSNAChallengeBinaryDataset(Dataset):
@@ -37,12 +39,12 @@ class RSNAChallengeBinaryDataset(Dataset):
         # Get images
         if self.subset is not None:
             self.image_paths = [
-                file_name for file_name in glob(os.path.join(image_dir, "*"))
-                if os.path.isfile(file_name) and os.path.normpath(file_name).split(os.path.sep)[-1].split(".")[0] in self.subset
+                file_name for file_name in glob(os.path.join(image_dir, '*'))
+                if os.path.isfile(file_name) and os.path.normpath(file_name).split(os.path.sep)[-1].split('.')[0] in self.subset
             ]
         else:
-            self.image_paths = [file_name for file_name in glob(os.path.join(image_dir, "*")) if os.path.isfile(file_name)]
-        print("Len img paths", len(self.image_paths))
+            self.image_paths = [file_name for file_name in glob(os.path.join(image_dir, '*')) if os.path.isfile(file_name)]
+        print('Len img paths', len(self.image_paths))
         self.images = list()
         if self.config['preload_images']:
             for image_path in self.image_paths:
@@ -75,15 +77,15 @@ class RSNAChallengeBinaryDataset(Dataset):
         return transform_list
 
     def _add_inference_transforms(self, transform_list: List) -> List:
-        if self.config['apply_center_crop_inf'] is not None and "multi_eq_crop" not in self.tta_options:
+        if self.config['apply_center_crop_inf'] is not None and 'multi_eq_crop' not in self.tta_options:
             transform_list.append(transforms.CenterCrop(self.config['random_crop']))
         if self.tta_options:
             transform_list.append(AddBatchDim())
-        if "multi_eq_crop" in self.tta_options:
-            transform_list.append(MultiEqualCrop(num_per_axis=self.tta_options["multi_eq_crop"], crop_size=self.config["random_crop"]))
-        if "flip_horz" in self.tta_options:
+        if 'multi_eq_crop' in self.tta_options:
+            transform_list.append(MultiEqualCrop(num_per_axis=self.tta_options['multi_eq_crop'], crop_size=self.config['random_crop']))
+        if 'flip_horz' in self.tta_options:
             transform_list.append(FlipTTA(flip_axis=3))
-        if "flip_vert" in self.tta_options:
+        if 'flip_vert' in self.tta_options:
             transform_list.append(FlipTTA(flip_axis=2))
         return transform_list
 
@@ -105,7 +107,7 @@ class RSNAChallengeBinaryDataset(Dataset):
         else:
             image = load_any_image(self.image_paths[idx])
         # Label from csv
-        base_file_name = os.path.normpath(self.image_paths[idx]).split(os.path.sep)[-1].split(".")[0]
+        base_file_name = os.path.normpath(self.image_paths[idx]).split(os.path.sep)[-1].split('.')[0]
         if self.labels is None:
             label = 0
         elif (self.labels['patientId'].eq(base_file_name)).any():
@@ -129,8 +131,8 @@ class RSNAChallengeBinaryDataset(Dataset):
 
 def plot_rsna_properties(dataset_info: Dict) -> Dict[str, go.Figure]:
     all_figures = dict()
-    if dataset_info["label_csv"]:
-        labels = pd.read_csv(dataset_info["label_csv"])
-        fig = px.histogram(labels, x="Target")
-        all_figures["Label Distribution"] = fig
+    if dataset_info['label_csv']:
+        labels = pd.read_csv(dataset_info['label_csv'])
+        fig = px.histogram(labels, x='Target')
+        all_figures['Label Distribution'] = fig
     return all_figures

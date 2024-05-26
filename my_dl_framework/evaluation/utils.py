@@ -2,21 +2,20 @@ import json
 import os
 import shutil
 from glob import glob
+from typing import (Dict, List, Tuple)
 
-import torch
 import numpy as np
-from typing import Dict, List, Tuple
-
-import yaml
-from clearml import Task, TaskTypes
-from clearml.config import running_remotely
-from torch.utils.data import DataLoader
-import torch.nn.functional as F
-from tqdm import tqdm
-from sklearn.metrics import confusion_matrix, f1_score, roc_curve, roc_auc_score, log_loss
-import plotly.graph_objects as go
 import plotly.figure_factory as ff
+import plotly.graph_objects as go
 import pytorch_lightning as pl
+import torch
+import torch.nn.functional as F
+import yaml
+from clearml import (Task, TaskTypes)
+from clearml.config import running_remotely
+from sklearn.metrics import (confusion_matrix, f1_score, log_loss, roc_auc_score, roc_curve)
+from torch.utils.data import DataLoader
+from tqdm import tqdm
 
 import my_dl_framework.constants as mc
 from my_dl_framework.data.utils import collate_aug_batch
@@ -53,7 +52,7 @@ def get_roc_curve(class_names: List[str], predictions: np.ndarray, targets: np.n
 
     fig.update_layout(xaxis_title='False Positive Rate',
                       yaxis_title='True Positive Rate',
-                      yaxis=dict(scaleanchor="x", scaleratio=1),
+                      yaxis=dict(scaleanchor='x', scaleratio=1),
                       xaxis=dict(constrain='domain'),
                       width=700,
                       height=500)
@@ -84,17 +83,17 @@ def get_confusion_matrix(conf_matrix: np.ndarray, class_names: List[str]) -> go.
 
     # add custom xaxis title
     fig.add_annotation(dict(
-        font=dict(color="black", size=14),
+        font=dict(color='black', size=14),
         x=0.5,
         y=-0.15,
         showarrow=False,
-        text="Predicted value",
+        text='Predicted value',
     ))
     return fig
 
 
 def calculate_metrics(predictions: np.ndarray, targets: np.ndarray, class_names: List[str]) -> Tuple[Dict, Dict]:
-    """ Calculate classification metrics from predictions (BxC) 
+    """ Calculate classification metrics from predictions (BxC)
         and targets (B)
     """
     metrics = dict()
@@ -109,7 +108,7 @@ def calculate_metrics(predictions: np.ndarray, targets: np.ndarray, class_names:
     accuracy[:-1] = np.mean(np.equal(np.argmax(predictions, 1), targets))
     accuracy[-1] = np.mean(accuracy[:-1])
     conf_matrix = confusion_matrix(targets, np.argmax(predictions, 1), labels=np.arange(len(class_names)))
-    plots["confusion_matrix"] = get_confusion_matrix(conf_matrix=conf_matrix, class_names=class_names)
+    plots['confusion_matrix'] = get_confusion_matrix(conf_matrix=conf_matrix, class_names=class_names)
     # Sensitivity / Specificity
     sensitivity = np.zeros([len(class_names) + 1])
     specificity = np.zeros([len(class_names) + 1])
@@ -136,14 +135,14 @@ def calculate_metrics(predictions: np.ndarray, targets: np.ndarray, class_names:
     auc_scores = np.zeros([len(class_names) + 1])
     fig, auc_scores[:-1] = get_roc_curve(class_names=class_names, predictions=predictions, targets=targets)
     auc_scores[-1] = np.mean(auc_scores[:-1])
-    plots["roc-curve"] = fig
-    metrics["log-loss-value"] = log_loss_value
-    metrics["accuracy"] = accuracy
-    metrics["f1-score"] = f1
-    metrics["sensitivity"] = sensitivity
-    metrics["specificity"] = specificity
-    metrics["precision"] = precision
-    metrics["auc-score"] = auc_scores
+    plots['roc-curve'] = fig
+    metrics['log-loss-value'] = log_loss_value
+    metrics['accuracy'] = accuracy
+    metrics['f1-score'] = f1
+    metrics['sensitivity'] = sensitivity
+    metrics['specificity'] = specificity
+    metrics['precision'] = precision
+    metrics['auc-score'] = auc_scores
     return metrics, plots
 
 
@@ -159,7 +158,7 @@ def aggregate_pred_and_tar(config: Dict, all_predictions: Dict, all_targets: Dic
     all_predictions_arr = np.zeros([len(all_predictions), len(class_names)])
     all_targets_arr = np.zeros([len(all_predictions)], dtype=np.int32)
     for idx, key in enumerate(all_predictions):
-        if config["test_aug_ensemble_mode"] == "mean":
+        if config['test_aug_ensemble_mode'] == 'mean':
             all_predictions_arr[idx, :] = np.mean(np.array(all_predictions[key]), axis=0)
         else:
             all_predictions_arr[idx, :] = all_predictions_arr[key][0]
@@ -182,7 +181,7 @@ def validate_model_classification(model: torch.nn.Module,
     :return:                Metrics, plots, predictions, targets
     """
     model.eval()
-    class_names = config["data"]["class_names"]
+    class_names = config['data']['class_names']
     # Get predictions
     all_predictions = dict()
     all_targets = dict()
@@ -217,19 +216,19 @@ def check_if_artifacts_exist(prev_task: Task, config: Dict, clearml_id: str):
     :return:
     """
     # Check if required artifact exists
-    if "pred arr _CV_avg" not in prev_task.artifacts and config["ensemble_type"] == "predict":
+    if 'pred arr _CV_avg' not in prev_task.artifacts and config['ensemble_type'] == 'predict':
         raise ValueError(f"ClearML task {clearml_id} does not have a prediction-style predictions file. Did you "
                          f"specify a successful evaluation task?")
-    if "tar arr _CV_avg" not in prev_task.artifacts and config["ensemble_type"] == "predict":
+    if 'tar arr _CV_avg' not in prev_task.artifacts and config['ensemble_type'] == 'predict':
         raise ValueError(f"ClearML task {clearml_id} does not have a prediction-style targets file. Did you "
                          f"specify a successful evaluation task?")
-    if "pred arr _CV_cat" not in prev_task.artifacts and config["ensemble_type"] == "eval":
+    if 'pred arr _CV_cat' not in prev_task.artifacts and config['ensemble_type'] == 'eval':
         raise ValueError(f"ClearML task {clearml_id} does not have a CV-eval-style predictions file. Did you "
                          f"specify a successful evaluation task?")
-    if "tar arr _CV_cat" not in prev_task.artifacts and config["ensemble_type"] == "eval":
+    if 'tar arr _CV_cat' not in prev_task.artifacts and config['ensemble_type'] == 'eval':
         raise ValueError(f"ClearML task {clearml_id} does not have a CV-eval-style targets file. Did you specify "
                          f"a successful evaluation task?")
-    if "training_config" not in prev_task.artifacts:
+    if 'training_config' not in prev_task.artifacts:
         raise ValueError(f"ClearML task {clearml_id} does not training config file. Did you specify "
                          f"a successful evaluation task?")
 
@@ -247,21 +246,21 @@ def add_experiments_from_clearml(config: Dict, all_eval_folders: List[str]) -> L
         check_if_artifacts_exist(prev_task, config, clearml_id)
         curr_folder = os.path.join(os.path.normpath(config['save_path']), clearml_id)
         os.makedirs(curr_folder, exist_ok=True)
-        path_to_file = prev_task.artifacts["training_config"].get_local_copy()
+        path_to_file = prev_task.artifacts['training_config'].get_local_copy()
         shutil.copy(path_to_file, os.path.join(curr_folder, mc.TRAIN_CFG_NAME))
-        if config["ensemble_type"] == "eval":
+        if config['ensemble_type'] == 'eval':
             if not os.path.exists(os.path.join(curr_folder, mc.PRED_FILE_NAME)):
-                path_to_file = prev_task.artifacts["pred arr _CV_cat"].get_local_copy()
+                path_to_file = prev_task.artifacts['pred arr _CV_cat'].get_local_copy()
                 shutil.copy(path_to_file, os.path.join(curr_folder, mc.PRED_FILE_NAME))
             if not os.path.exists(os.path.join(curr_folder, mc.TAR_FILE_NAME)):
-                path_to_file = prev_task.artifacts["tar arr _CV_cat"].get_local_copy()
+                path_to_file = prev_task.artifacts['tar arr _CV_cat'].get_local_copy()
                 shutil.copy(path_to_file, os.path.join(curr_folder, mc.TAR_FILE_NAME))
-        elif config["ensemble_type"] == "predict":
+        elif config['ensemble_type'] == 'predict':
             if not os.path.exists(os.path.join(curr_folder, mc.PRED_FILE_NAME)):
-                path_to_file = prev_task.artifacts["pred arr _CV_avg"].get_local_copy()
+                path_to_file = prev_task.artifacts['pred arr _CV_avg'].get_local_copy()
                 shutil.copy(path_to_file, os.path.join(curr_folder, mc.PRED_FILE_NAME))
             if not os.path.exists(os.path.join(curr_folder, mc.TAR_FILE_NAME)):
-                path_to_file = prev_task.artifacts["tar arr _CV_avg"].get_local_copy()
+                path_to_file = prev_task.artifacts['tar arr _CV_avg'].get_local_copy()
                 shutil.copy(path_to_file, os.path.join(curr_folder, mc.TAR_FILE_NAME))
         # Add to normal folder list
         all_eval_folders.append(curr_folder)
@@ -283,7 +282,7 @@ def gather_predictions(all_eval_folders: List[str]) -> Tuple[List, List, Dict]:
         if not os.path.isfile(os.path.join(curr_subfolder, mc.TAR_FILE_NAME)):
             raise ValueError(f"Could not find targets_all.npy in folder {curr_subfolder}")
         if training_config is None and os.path.isfile(os.path.join(curr_subfolder, mc.TRAIN_CFG_NAME)):
-            with open(os.path.join(curr_subfolder, mc.TRAIN_CFG_NAME), encoding="utf-8") as file:
+            with open(os.path.join(curr_subfolder, mc.TRAIN_CFG_NAME), encoding='utf-8') as file:
                 training_config = yaml.safe_load(file)
         pred = np.load(os.path.join(curr_subfolder, mc.PRED_FILE_NAME))
         pred_list.append(pred)
@@ -303,13 +302,13 @@ def define_tta_options(tta_flip_horz: bool, tta_flip_vert: bool, tta_multi_eq_cr
     batch_size_factor = 1
     tta_options = dict()
     if tta_flip_horz:
-        tta_options["flip_horz"] = True
+        tta_options['flip_horz'] = True
         batch_size_factor *= 2
     if tta_flip_vert:
-        tta_options["flip_vert"] = True
+        tta_options['flip_vert'] = True
         batch_size_factor *= 2
     if tta_multi_eq_crop > 0:
-        tta_options["multi_eq_crop"] = tta_multi_eq_crop
+        tta_options['multi_eq_crop'] = tta_multi_eq_crop
         batch_size_factor *= tta_multi_eq_crop
     if tta_options:
         collate_fn = collate_aug_batch
@@ -347,15 +346,15 @@ def setup_folders_and_clearml(folder: str, clearml_id: str):
                 fold_exists = False
         # Config
         config_dict = prev_task.get_parameters_as_dict()
-        config_dict = {key: parse_str(val) for key, val in config_dict["General"].items()}
-        with open(os.path.join(folder, mc.CFG_NAME), "w", encoding="utf-8") as file:
+        config_dict = {key: parse_str(val) for key, val in config_dict['General'].items()}
+        with open(os.path.join(folder, mc.CFG_NAME), 'w', encoding='utf-8') as file:
             yaml.safe_dump(config_dict, file)
         # CV split file
-        artifact_str = "cv_split_file"
+        artifact_str = 'cv_split_file'
         if artifact_str in prev_task.artifacts:
-            print("CV split file found, downloading...")
+            print('CV split file found, downloading...')
             path_to_file = prev_task.artifacts[artifact_str].get_local_copy()
-            shutil.copy(path_to_file, os.path.join(folder, "cv_split_file.json"))
+            shutil.copy(path_to_file, os.path.join(folder, 'cv_split_file.json'))
     elif folder is None or not os.path.exists(folder):
         raise ValueError(f"Provided subfolder does not exist. ({folder})")
     if not os.path.isfile(os.path.join(folder, mc.CFG_NAME)):
@@ -371,10 +370,10 @@ def get_data_split(cv_eval: bool, folder: str) -> Dict:
     """
     data_split = None
     if cv_eval:
-        cv_split_file = os.path.join(folder, "cv_split_file.json")
+        cv_split_file = os.path.join(folder, 'cv_split_file.json')
         if not os.path.isfile(cv_split_file):
-            raise ValueError("Could not find a CV in the folder although CV eval was executed")
-        with open(cv_split_file, encoding="utf-8") as file:
+            raise ValueError('Could not find a CV in the folder although CV eval was executed')
+        with open(cv_split_file, encoding='utf-8') as file:
             data_split = json.load(file)
             print(f'Using CV split file {cv_split_file}')
     return data_split
@@ -388,19 +387,19 @@ def get_clearml_tags(cv_eval: bool, eval_on_train: bool, limit_batches: int, don
     """
     tags = list()
     if cv_eval:
-        tags.append("CVEval")
+        tags.append('CVEval')
     else:
-        tags.append("Predict")
+        tags.append('Predict')
     if eval_on_train:
-        tags.append("EvalOnTrain")
+        tags.append('EvalOnTrain')
     if limit_batches is not None:
         tags.append(f"Lim{limit_batches}")
     if dont_log_splits:
-        tags.append("NoSplits")
+        tags.append('NoSplits')
     if tta_flip_horz:
-        tags.append("TTAFlipH")
+        tags.append('TTAFlipH')
     if tta_flip_vert:
-        tags.append("TTAFlipV")
+        tags.append('TTAFlipV')
     if tta_multi_eq_crop:
         tags.append(f"TTAMEQ{tta_multi_eq_crop}")
     return tags
@@ -419,34 +418,34 @@ def aggregate_eval_results(cv_eval: bool, eval_on_train: bool, pred_list: List, 
         pred_list = np.array(pred_list)
         tar_list = np.array(tar_list)
         if cv_eval:
-            prefix = "_CV_cat"
+            prefix = '_CV_cat'
             pred_all = np.concatenate(pred_list, axis=0).reshape([-1, pred_list[0].shape[-1]])
             tar_all = np.concatenate(tar_list, axis=0).reshape([-1])
         else:
-            prefix = "_CV_avg"
+            prefix = '_CV_avg'
             pred_all = np.squeeze(np.mean(pred_list, axis=0, keepdims=False), axis=0)
             tar_all = np.squeeze(np.mean(tar_list, axis=0, keepdims=False), axis=0)
         if eval_on_train:
             pred_train_val_all = np.concatenate(pred_train_val_list, axis=0).reshape([-1, pred_train_val_list[0].shape[-1]])
             tar_train_val_all = np.concatenate(tar_train_val_list, axis=0).reshape([-1])
-        np.save(os.path.join(curr_pred_folder, "predictions_all.npy"), pred_all)
-        np.save(os.path.join(curr_pred_folder, "targets_all.npy"), tar_all)
+        np.save(os.path.join(curr_pred_folder, 'predictions_all.npy'), pred_all)
+        np.save(os.path.join(curr_pred_folder, 'targets_all.npy'), tar_all)
         if eval_on_train:
-            np.save(os.path.join(curr_pred_folder, "predictions_train_val_all.npy"), pred_train_val_all)
-            np.save(os.path.join(curr_pred_folder, "targets_train_val_all.npy"), tar_train_val_all)
+            np.save(os.path.join(curr_pred_folder, 'predictions_train_val_all.npy'), pred_train_val_all)
+            np.save(os.path.join(curr_pred_folder, 'targets_train_val_all.npy'), tar_train_val_all)
         if clearml:
             # Store intermediate preds from CV
-            task.upload_artifact(f"pred arr {prefix}", os.path.join(curr_pred_folder, "predictions_all.npy"))
-            task.upload_artifact(f"tar arr {prefix}", os.path.join(curr_pred_folder, "targets_all.npy"))
+            task.upload_artifact(f"pred arr {prefix}", os.path.join(curr_pred_folder, 'predictions_all.npy'))
+            task.upload_artifact(f"tar arr {prefix}", os.path.join(curr_pred_folder, 'targets_all.npy'))
         # Perform evaluation through last model
         if cv_eval or label_csv_path is not None:
-            model.calc_and_log_metrics(loggers=loggers, predictions=pred_all, targets=tar_all, eval_name="validation", prefix=prefix, step=0)
+            model.calc_and_log_metrics(loggers=loggers, predictions=pred_all, targets=tar_all, eval_name='validation', prefix=prefix, step=0)
         if pred_train_val_all is not None:
             model.calc_and_log_metrics(loggers=loggers,
                                        predictions=pred_train_val_all,
                                        targets=tar_train_val_all,
-                                       eval_name="train_val",
-                                       prefix="_CV_cat",
+                                       eval_name='train_val',
+                                       prefix='_CV_cat',
                                        step=0)
 
 
@@ -468,7 +467,7 @@ def setup_clearml(clearml: bool, tags: List, arg_dict: Dict, folder: str):
         task.connect(arg_dict)
         task.add_tags(tags)
         # Upload config for potential later use
-        task.upload_artifact(name="training_config", artifact_object=os.path.join(folder, mc.CFG_NAME))
+        task.upload_artifact(name='training_config', artifact_object=os.path.join(folder, mc.CFG_NAME))
     return task
 
 
@@ -487,16 +486,16 @@ def run_checks(curr_subfolder_cv: str, data_split: Dict, label_csv_path: str, cv
         continue_loop = True
     print(f'Starting fold number {cv_idx + 1}')
     if data_split is not None:
-        subset_train = data_split["training_splits"][cv_idx]
-        subset_val = data_split["validation_splits"][cv_idx]
+        subset_train = data_split['training_splits'][cv_idx]
+        subset_val = data_split['validation_splits'][cv_idx]
     else:
         subset_train = list()
-        subset_val = [file_path.split(os.sep)[-1].split(".")[0] for file_path in glob(image_path + "/*")]
+        subset_val = [file_path.split(os.sep)[-1].split('.')[0] for file_path in glob(image_path + '/*')]
     # Data
     if label_csv_path is not None:
         path_to_label_csv = label_csv_path
     elif cv_eval:
-        path_to_label_csv = os.path.join(image_path.replace(image_path.split(os.sep)[-1], ""), config['csv_name'])
+        path_to_label_csv = os.path.join(image_path.replace(image_path.split(os.sep)[-1], ''), config['csv_name'])
     else:
         path_to_label_csv = None
     return continue_loop, path_to_label_csv, subset_val, subset_train
@@ -506,9 +505,9 @@ def setup_loggers(task: Task, curr_subfolder_cv_pred: str, cv_idx: int, dont_log
     """
     Setup loggers for clearml and csv logging
     """
-    csv_logger = pl.loggers.CSVLogger(curr_subfolder_cv_pred, name="eval_local_logs")
+    csv_logger = pl.loggers.CSVLogger(curr_subfolder_cv_pred, name='eval_local_logs')
     if task is not None:
-        pl_clearml_logger = PLClearML(task=task, name_base="CV" + str(cv_idx + 1), title_prefix=mc.CV_PREFIX)
+        pl_clearml_logger = PLClearML(task=task, name_base='CV' + str(cv_idx + 1), title_prefix=mc.CV_PREFIX)
     else:
         pl_clearml_logger = None
     loggers = [csv_logger]

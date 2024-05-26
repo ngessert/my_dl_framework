@@ -1,7 +1,10 @@
-import torch
+"""
+Data handling utils
+"""
+from PIL import Image
 import numpy as np
 import pydicom
-from typing import List
+import torch
 
 
 def load_any_image(image_path: str) -> np.ndarray:
@@ -11,9 +14,11 @@ def load_any_image(image_path: str) -> np.ndarray:
     :param image_path:      Path to the image to load
     :return:                The image as numpy array
     """
-    if image_path.endswith(".dcm"):
+    if image_path.endswith('.dcm'):
         dicom = pydicom.dcmread(image_path)
         image = dicom.pixel_array
+    elif image_path.endswith('.png'):
+        image = np.array(Image.open(image_path))
     else:
         raise ValueError(f'Unknown image type {image_path}')
     return image
@@ -68,10 +73,12 @@ class MultiEqualCrop:
             for j in range(self.num_per_axis):
                 x_loc = int((self.crop_size / 2) + i * ((image.shape[2] - self.crop_size) / (self.num_per_axis - 1)))
                 y_loc = int((self.crop_size / 2) + j * ((image.shape[2] - self.crop_size) / (self.num_per_axis - 1)))
-                crop_img = image[:, :,
-                                 x_loc - int(self.crop_size / 2): x_loc + int(self.crop_size / 2),
-                                 y_loc - int(self.crop_size / 2): y_loc + int(self.crop_size / 2),
-                                 ]
+                crop_img = image[
+                    :,
+                    :,
+                    x_loc - int(self.crop_size / 2):x_loc + int(self.crop_size / 2),
+                    y_loc - int(self.crop_size / 2):y_loc + int(self.crop_size / 2),
+                ]
                 crop_list.append(crop_img)
         result = torch.cat(crop_list)
         return result
